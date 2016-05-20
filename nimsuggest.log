@@ -1,2 +1,4 @@
 illformed AST: defined()
 illformed AST: defined()
+illformed AST: prc[3].len: if i == 0:  else: echo
+illformed AST: prc[3].len: if i == 0:  else: echo

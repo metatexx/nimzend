@@ -28,7 +28,7 @@ task build, "builds the extension":
 
 task test, "runs a simple test":
   setCommand "nop"
-  exec """php -r 'dl("""" & extensionName & """.so"); echo nim(123).PHP_EOL; echo nim(-1).PHP_EOL;'"""
+  exec """php -r 'dl("""" & extensionName & """.so"); echo nimgreets("Hello World!").PHP_EOL; echo nimsqr(9).PHP_EOL;'"""
 
 task clean, "removes the extension from extension dir":
   setCommand "nop"

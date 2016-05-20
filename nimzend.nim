@@ -1,14 +1,18 @@
-# nim c --app:lib --d:php54-d:release -l:"-undefined suppress -flat_namespace" -o:../nimzend.so --verbosity:0
-# runphp dl("nimzend.so"); $a=4711; echo nim(1234).' '.substr(nim(-1),0,40);
+# nim build nimext
+## nim c --app:lib --d:php54-d:release -l:"-undefined suppress -flat_namespace" -o:../nimzend.so --verbosity:0
+## runphp dl("nimzend.so"); $a=4711; echo nim(1234).' '.substr(nim(-1),0,40);
 
 # Minimal Zend Module
 import macros
+import strutils
 
 when defined(php504):
   const ZEND_MODULE_API_NO = 20100525
 elif defined(php503):
   const ZEND_MODULE_API_NO = 20090626
-else: {.error:"You need to define the PHP version (php54 php53)".}
+else:
+  const ZEND_MODULE_API_NO = 20090626
+  {.error:"You need to define the PHP version (php54 php53)".}
 
 type
   ZendModuleEntry* = object # not {.packed.} !
@@ -80,7 +84,7 @@ converter zendTypes*(x: ZendTypes): uint8 = x.uint8
 
 proc zend_zval_type_name*(arg: ZVal): cstring {.stdcall,importc.}
 
-proc zend_parse_parameters*(num: int, format: cstring, data: ptr int): int {.importc.}
+proc zend_parse_parameters*(num: int, format: cstring, p1,p2,p3,p4,p5,p6,p7,p8: pointer): int {.importc: "zend_parse_parameters".}
 
 proc pmalloc*(size: int): pointer {.importc:"_emalloc".}
 proc pfree*(mem: pointer) {.importc:"_efree".}
@@ -88,13 +92,13 @@ proc pstrdup*(txt: cstring): cstring {.importc:"_estrdup".}
 
 # Our Functions
 
-template return_string*(s) =
+template returnString*(s) =
   returnValue.value.str.text = pstrdup(s)
   returnValue.value.str.len = s.len
   returnValue.kind = IS_STRING
   return
 
-template return_long*(s) =
+template returnLong*(s) =
   returnValue.value.long = s
   returnValue.kind = IS_LONG
   return
@@ -117,10 +121,32 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
 
   result = newNimNode(nnkStmtList)
 
-  prc[0] = newIdentNode("zif_" & $prc[0].ident)
+  var phpName = $prc[0].ident
+  var zifName = "zif_" & phpName
+  prc[0] = newIdentNode(zifName)
 
   if prc[3][0].kind != nnkEmpty:
     error("phpfunc proc needs a void return value")
+
+  var body = newNimNode(nnkStmtList)
+
+  if prc[3].len > 1:
+    # declaration of "ref" variables
+    for i in 1 ..< prc[3].len:
+      let vname = $prc[3][i][0]
+      let kind = $prc[3][i][1]
+      #let vref = (prc[3][i][2].kind == nnkEmpty)
+      case kind:
+        of "int": body.add parseStmt("(var " & vname & ": int;" &
+          "discard zend_parse_parameters(ht, \"l\", " & vname & ".addr, nil, nil, nil, nil, nil, nil, nil))")
+        of "int8": body.add parseStmt("(var " & vname & ": int8;" &
+          "var l: int; discard zend_parse_parameters_int(ht, \"l\", l.addr, nil, nil, nil, nil, nil, nil, nil); " & vname & "=l.int8)")
+        of "string": body.add parseStmt("(var " & vname & ": string;" &
+          "var ip_s: cstring; var ip_l: int; discard zend_parse_parameters(ht, \"s\", ip_s.addr, ip_l.addr, nil, nil, nil, nil, nil, nil); " & vname & " = $ip_s)")
+        else: error("parameter type not supported")
+
+  prc[3] = newNimNode(nnkFormalParams)
+  prc[3].add newEmptyNode()
 
   var n = newNimNode(nnkIdentDefs)
   n.add newIdentNode("ht")
@@ -154,8 +180,11 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
   n.add newEmptyNode()
   prc[3].add n
 
+  body.add prc[6]
+  prc[6] = body
+
   result.add prc
-  result.add parseStmt("""zf.add(ZendFunctionEntry(fname: "nim", handler: zif_nim))""")
+  result.add parseStmt("zf.add(ZendFunctionEntry(fname: \"$1\", handler: $2))".format(phpName,zifName))
 
 macro phpfunc*(prc: stmt): stmt {.immediate.} =
   # not sure about the nnkStmtList
