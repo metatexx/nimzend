@@ -1,5 +1,5 @@
 # nim build --verbosity:0
-# runphp dl("testmod.so"); $a=4711; echo nim(1234).' '.substr(nim(-1),0,40);
+# runphp dl("nimext.so"); $a=4711; echo nim(1234).' '.substr(nim(-1),0,40);
 
 import nimzend
 
