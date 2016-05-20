@@ -6,7 +6,19 @@ task build, "builds the extension":
   setCommand "c"
   switch("app", "lib")
   switch("d", "phpext")
-  switch("l", "-undefined suppress -flat_namespace")
+
+  var os = gorge("uname -s")
+  if os == "Darwin":
+    switch("l", "-undefined suppress -flat_namespace")
+  elif os == "Linux":
+    switch("l", "-undefined")
+  else:
+    echo "OS not supported"
+    quit 5
+
+  var phpver = gorge("php-config --vernum")[0..2]
+  switch("d", "php" & phpver)
+
   var extensionDir = gorge("php-config --extension-dir")
   if fileExists(extensionDir / extensionName & ".so"):
     echo "Removing previous version from: ", extensionDir

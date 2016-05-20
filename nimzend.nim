@@ -1,12 +1,14 @@
-# nim c --app:lib --d:phpext -d:release -l:"-undefined suppress -flat_namespace" -o:../nimzend.so --verbosity:0
+# nim c --app:lib --d:php54-d:release -l:"-undefined suppress -flat_namespace" -o:../nimzend.so --verbosity:0
 # runphp dl("nimzend.so"); $a=4711; echo nim(1234).' '.substr(nim(-1),0,40);
 
 # Minimal Zend Module
 import macros
 
-when not defined(phpext):
-  when defined(release):
-    {.error: "need --d:phpext in commandline".}
+when defined(php504):
+  const ZEND_MODULE_API_NO = 20100525
+elif defined(php503):
+  const ZEND_MODULE_API_NO = 20090626
+else: {.error:"You need to define the PHP version (php54 php53)".}
 
 type
   ZendModuleEntry* = object # not {.packed.} !
@@ -73,8 +75,6 @@ type
   ZVal* = ptr ZValObj
 
 converter zendTypes*(x: ZendTypes): uint8 = x.uint8
-
-const ZEND_MODULE_API_NO = 20100525
 
 # zend functions
 
