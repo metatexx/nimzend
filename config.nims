@@ -7,10 +7,9 @@ task build, "builds the extension":
   switch("app", "lib")
   switch("d", "phpext")
 
-  var os = gorge("uname -s")
-  if os == "Darwin":
+  if defined(macosx):
     switch("l", "-undefined suppress -flat_namespace")
-  elif os == "Linux":
+  elif defined(posix):
     switch("l", "-undefined")
   else:
     echo "OS not supported"
@@ -26,7 +25,7 @@ task build, "builds the extension":
   echo "Installing to: ", extensionDir
   switch("o", extensionDir / extensionName & ".so")
 
-task test, "runs a simple test":
+task tests, "runs a simple test":
   setCommand "nop"
   exec """php -r 'dl("""" & extensionName & """.so"); echo nimgreets("Hello World!").PHP_EOL; echo nimsqr(9).PHP_EOL;'"""
 

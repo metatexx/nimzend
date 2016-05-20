@@ -107,8 +107,6 @@ template notDiscarded*(): bool =
   (retval_used == 1)
 
 proc zifProc(prc: NimNode): NimNode {.compileTime.} =
-  ## This macro makes all parameter lazy by transforming them to proc calls
-
   #echo ht
   #echo cast[int](returnValue)
   #echo cast[int](returnValuePtr)
