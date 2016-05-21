@@ -32,7 +32,7 @@ proc nim_fun(num: float, txt: string, sep: string = ",", tresh: float = 1.0, foo
 proc nim_alpha(str: string): string {.phpfunc.} =
   result = ""
   for ch in str:
-        if ch >= 'a' and ch <= 'z' or ch >= 'A' and ch <= 'Z':
+        if ch in {'a'..'z', 'A'..'Z'}:
           result.add ch
 
 
