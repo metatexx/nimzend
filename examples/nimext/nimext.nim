@@ -1,5 +1,6 @@
 # nim build --verbosity:0
-# runphp dl("nimext.so"); echo nimfun(2.5, "Hello World!", " - ").PHP_EOL;
+# runphp dl("nimext.so"); echo nim_alpha("12H!e#0&ll3_o?").PHP_EOL;
+# runphp dl("nimext.so"); echo nim_fun(2.5, "Hello World!", " - ").PHP_EOL;
 
 import nimzend
 import math
@@ -8,7 +9,7 @@ import math
 # my code
 #
 
-proc nimfun(num: float, txt: string, sep: string = ",", tresh: float = 1.0, foo: int = 123, bar: bool = true) {.phpfunc.} =
+proc nim_fun(num: float, txt: string, sep: string = ",", tresh: float = 1.0, foo: int = 123, bar: bool = true) {.phpfunc.} =
   if notDiscarded:
     var r = ""
     var cnt = num.int
@@ -27,5 +28,12 @@ proc nimfun(num: float, txt: string, sep: string = ",", tresh: float = 1.0, foo:
       r.add $foo
 
     returnString(r)
+
+proc nim_alpha(str: string): string {.phpfunc.} =
+  result = ""
+  for ch in str:
+        if ch >= 'a' and ch <= 'z' or ch >= 'A' and ch <= 'Z':
+          result.add ch
+
 
 finishExtension("nimext","0.1")

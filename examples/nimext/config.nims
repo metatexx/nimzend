@@ -7,4 +7,5 @@ switch("p", "../../src/")
 
 task tests, "runs a simple test":
   setCommand "nop"
-  exec """php -r 'dl("""" & extensionName & """.so");  echo nimfun(2.5, "Hello World!", " - ").PHP_EOL;'"""
+  exec """php -r 'dl("""" & extensionName & """.so");  echo nim_fun(2.5, "Hello World!", " - ").PHP_EOL;'"""
+  exec """php -r 'dl("""" & extensionName & """.so");  echo nim_alpha("1!2N%im3L&4a/ng5").PHP_EOL;'"""

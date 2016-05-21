@@ -132,7 +132,9 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
   var zifName = "zif_" & phpName
   prc[0] = newIdentNode(zifName)
 
-  if prc[3][0].kind != nnkEmpty:
+  var autoResult = prc[3][0]
+
+  if not (autoResult.kind in {nnkEmpty, nnkIdent}):
     error("phpfunc proc needs a void return value")
 
   var body = newNimNode(nnkStmtList)
@@ -209,7 +211,7 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
       body.add parseStmt(fix)
 
   prc[3] = newNimNode(nnkFormalParams)
-  prc[3].add newEmptyNode()
+  prc[3].add copyNimNode(autoResult)
 
   prc[3].add newParam("ht","int")
   prc[3].add newParam("returnValue","ZVal")
@@ -218,6 +220,16 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
   prc[3].add newParam("retvalUsed","int")
 
   body.add prc[6]
+
+  # works only for implicit returns (needs to scan body otherwise)
+  if autoResult.kind == nnkIdent:
+    case $autoResult.ident:
+      of "int": body.add parseStmt("returnLong resukt")
+      of "string": body.add parseStmt("returnString result")
+      of "float": body.add parseStmt("returnFloat result")
+      of "bool": body.add parseStmt("returnFloat bool")
+      else: error "Automatic result type '" & $autoResult.ident & "' not supported"
+
   prc[6] = body
 
   result.add prc
