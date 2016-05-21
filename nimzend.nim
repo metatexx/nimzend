@@ -84,16 +84,16 @@ converter zendTypes*(x: ZendTypes): uint8 = x.uint8
 
 proc zend_zval_type_name*(arg: ZVal): cstring {.stdcall,importc.}
 
-proc zend_parse_parameters*(num: int, format: cstring, p1,p2,p3,p4,p5,p6,p7,p8: pointer): int {.importc: "zend_parse_parameters".}
+proc zend_parse_parameters*(num: int, format: cstring): int {.importc: "zend_parse_parameters", varargs.}
 
-proc pmalloc*(size: int): pointer {.importc:"_emalloc".}
-proc pfree*(mem: pointer) {.importc:"_efree".}
-proc pstrdup*(txt: cstring): cstring {.importc:"_estrdup".}
+proc emalloc*(size: int): pointer {.importc:"_emalloc".}
+proc efree*(mem: pointer) {.importc:"_efree".}
+proc estrdup*(txt: cstring): cstring {.importc:"_estrdup".}
 
 # Our Functions
 
 template returnString*(s) =
-  returnValue.value.str.text = pstrdup(s)
+  returnValue.value.str.text = estrdup(s)
   returnValue.value.str.len = s.len
   returnValue.kind = IS_STRING
   return
@@ -129,19 +129,75 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
   var body = newNimNode(nnkStmtList)
 
   if prc[3].len > 1:
-    # declaration of "ref" variables
+    # we simulate real parameters (optional)
+    var fmt = ""
+    var args = ""
+    var fixs: seq[string] = @[]
+    var vargs = false
     for i in 1 ..< prc[3].len:
       let vname = $prc[3][i][0]
       let kind = $prc[3][i][1]
-      #let vref = (prc[3][i][2].kind == nnkEmpty)
+      #echo prc[3][i].lispRepr
+      let default = prc[3][i][2].kind
+
+      if default != nnkEmpty:
+        # first time we have variable params we add the `|`
+        if not vargs:
+          fmt.add "|"
+          vargs = true
+
       case kind:
-        of "int": body.add parseStmt("(var " & vname & ": int;" &
-          "discard zend_parse_parameters(ht, \"l\", " & vname & ".addr, nil, nil, nil, nil, nil, nil, nil))")
-        of "int8": body.add parseStmt("(var " & vname & ": int8;" &
-          "var l: int; discard zend_parse_parameters_int(ht, \"l\", l.addr, nil, nil, nil, nil, nil, nil, nil); " & vname & "=l.int8)")
-        of "string": body.add parseStmt("(var " & vname & ": string;" &
-          "var ip_s: cstring; var ip_l: int; discard zend_parse_parameters(ht, \"s\", ip_s.addr, ip_l.addr, nil, nil, nil, nil, nil, nil); " & vname & " = $ip_s)")
-        else: error("parameter type not supported")
+        of "int":
+          var tmp = "var " & vname & ": int"
+          if default != nnkEmpty:
+            tmp.add " = " & $prc[3][i][2].intVal
+          body.add parseStmt tmp
+
+          fmt.add "l"
+          args.add ", " & vname & ".addr"
+
+        of "bool":
+          var tmp = "var " & vname & ": bool"
+          if default != nnkEmpty:
+            tmp.add " = " & $prc[3][i][2].ident
+          body.add parseStmt tmp
+          var help = "zifq" & $i & "_" & vname
+          body.add parseStmt "var " & help & ": int8 = 123"
+          fmt.add "b"
+          args.add ", " & help & ".addr"
+          # default values for bool are tricky to test for but this works
+          fixs.add "if " & help & " != 123: " & vname & "=" & help & "!= 0"
+
+        of "float":
+          var tmp = "var " & vname & ": float64"
+          if default != nnkEmpty:
+            tmp.add " = " & $ prc[3][i][2].floatVal
+          body.add parseStmt tmp
+          fmt.add "d"
+          args.add ", " & vname & ".addr"
+
+        of "string":
+          var help_s = "zifq" & $i & "s_" & vname
+          var help_l = "zifq" & $i & "l_" & vname
+
+          body.add parseStmt "var " & vname & ": string"
+          body.add parseStmt "var " & help_s & ": cstring"
+          body.add parseStmt "var " & help_l & ":ptr int64"
+          fmt.add "s"
+          args.add  ", " & help_s & ".addr, " & help_l & ".addr"
+          # default values for strings are more expensive so we just
+          # do them if needed
+          if default != nnkEmpty:
+            fixs.add "if " & help_s & " != nil: " & vname & "= $" & help_s & " else: " & vname & "=\"\"\"" & $prc[3][i][2].strVal & "\"\"\""
+          else:
+            fixs.add vname & "= $" & help_s
+        else:
+          error("Parameter Type '" & $kind & "' not supported")
+
+    body.add parseStmt("discard zend_parse_parameters(ht, \"" & fmt & "\" " & args & ")")
+
+    for fix in fixs:
+      body.add parseStmt(fix)
 
   prc[3] = newNimNode(nnkFormalParams)
   prc[3].add newEmptyNode()

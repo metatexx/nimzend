@@ -1,18 +1,31 @@
 # nim build --verbosity:0
-# runphp dl("nimext.so"); echo nimgreets("Hello World!").PHP_EOL; echo nimsqr(9).PHP_EOL;
+# runphp dl("nimext.so"); echo nimfun(2.5, "Hello World!", " - ").PHP_EOL;
 
 import nimzend
+import math
 
 #
 # my code
 #
 
-proc nimgreets(s: string) {.phpfunc.} =
+proc nimfun(num: float, txt: string, sep: string = ",", tresh: float = 1.0, foo: int = 123, bar: bool = true) {.phpfunc.} =
   if notDiscarded:
-    returnString(s)
+    var r = ""
+    var cnt = num.int
+    # just for fun
+    if num.floor() != num:
+      r.add "*"
 
-proc nimsqr(n: int) {.phpfunc.} =
-  if notDiscarded:
-    returnLong(n * n)
+    if tresh > 0.5:
+      r.add "+"
+
+    for i in 0 ..< cnt:
+      if i > 0: r.add sep
+      r.add txt
+
+    if bar:
+      r.add $foo
+
+    returnString(r)
 
 finishExtension("nimext","0.1")
