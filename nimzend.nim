@@ -1,10 +1,6 @@
-# nim build nimext
-## nim c --app:lib --d:php54-d:release -l:"-undefined suppress -flat_namespace" -o:../nimzend.so --verbosity:0
-## runphp dl("nimzend.so"); $a=4711; echo nim(1234).' '.substr(nim(-1),0,40);
-
 # Minimal Zend Module
+
 import macros
-import strutils
 
 when defined(php504):
   const ZEND_MODULE_API_NO = 20100525
@@ -20,7 +16,7 @@ type
     zend_api: uint32
     zend_debug: uint8
     zts: uint8
-    init_entry: pointer #const struct _zend_ini_entry *ini_entry;
+    ini_entry: pointer #const struct _zend_ini_entry *ini_entry;
     deps: pointer #const struct _zend_module_dep *deps;
     name: cstring
     functions: pointer #const struct _zend_function_entry *functions;
@@ -238,7 +234,7 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
   prc[6] = body
 
   result.add prc
-  result.add parseStmt("zf.add(ZendFunctionEntry(fname: \"$1\", handler: $2))".format(phpName,zifName))
+  result.add parseStmt("zf.add(ZendFunctionEntry(fname: \"" & phpName & "\", handler: " & zifName & "))")
 
 macro phpfunc*(prc: stmt): stmt {.immediate.} =
   # not sure about the nnkStmtList
@@ -254,8 +250,20 @@ macro phpfunc*(prc: stmt): stmt {.immediate.} =
 var zf*: seq[ZendFunctionEntry] = @[]
 var zm*: ZendModuleEntry # global allocated!
 
-proc get_module*(): ptr ZendModuleEntry {.stdcall,exportc,dynlib.} =
+proc get_module(): ptr ZendModuleEntry {.stdcall,exportc:"get_module",dynlib.} =
   result = zm.addr
+
+proc moduleStartup() {.stdcall.} =
+  discard
+
+proc moduleShutdown() {.stdcall.} =
+  discard
+
+proc requestStartup() {.stdcall.} =
+  discard
+
+proc requestShutdown() {.stdcall.} =
+  discard
 
 proc finishExtension*(name, version: string) =
   # build the Zend Module info
@@ -263,11 +271,16 @@ proc finishExtension*(name, version: string) =
   zm.zend_api = ZEND_MODULE_API_NO
   zm.zend_debug = 0
   zm.zts = 0
-  zm.init_entry = nil
+  zm.ini_entry = nil
   zm.deps = nil
   zm.name = name
   zm.version = version
   zm.build_id = "API" & $ZEND_MODULE_API_NO & ",NTS"
+
+  zm.module_startup_func = moduleStartup
+  zm.module_shutdown_func = moduleShutdown
+  zm.request_startup_func = requestStartup
+  zm.request_shutdown_func = requestShutdown
 
   zm.functions = zf[0].addr
 
