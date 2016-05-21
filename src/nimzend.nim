@@ -8,7 +8,7 @@ elif defined(php503):
   const ZEND_MODULE_API_NO = 20090626
 else:
   const ZEND_MODULE_API_NO = 20090626
-  {.error:"You need to define the PHP version (php54 php53)".}
+  #{.error:"You need to define the PHP version (php54 php53)".}
 
 type
   ZendModuleEntry* = object # not {.packed.} !
@@ -79,7 +79,6 @@ converter zendTypes*(x: ZendTypes): uint8 = x.uint8
 # zend functions
 
 proc zend_zval_type_name*(arg: ZVal): cstring {.stdcall,importc.}
-
 proc zend_parse_parameters*(num: int, format: cstring): int {.importc: "zend_parse_parameters", varargs.}
 
 proc emalloc*(size: int): pointer {.importc:"_emalloc".}
@@ -101,6 +100,20 @@ template returnLong*(s) =
 
 template notDiscarded*(): bool =
   (retval_used == 1)
+
+proc newParam(name: string, kind: string): NimNode {.compiletime.} =
+  result = newNimNode(nnkIdentDefs)
+  result.add newIdentNode(name)
+  result.add newIdentNode(kind)
+  result.add newEmptyNode()
+
+proc newPtrParam(name: string, kind: string): NimNode {.compiletime.} =
+  result = newNimNode(nnkIdentDefs)
+  result.add newIdentNode(name)
+  var p = newNimNode(nnkPtrTy)
+  p.add newIdentNode(kind)
+  result.add p
+  result.add newEmptyNode()
 
 proc zifProc(prc: NimNode): NimNode {.compileTime.} =
   #echo ht
@@ -198,37 +211,11 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
   prc[3] = newNimNode(nnkFormalParams)
   prc[3].add newEmptyNode()
 
-  var n = newNimNode(nnkIdentDefs)
-  n.add newIdentNode("ht")
-  n.add newIdentNode("int")
-  n.add newEmptyNode()
-  prc[3].add n
-
-  n = newNimNode(nnkIdentDefs)
-  n.add newIdentNode("returnValue")
-  n.add newIdentNode("ZVal")
-  n.add newEmptyNode()
-  prc[3].add n
-
-  n = newNimNode(nnkIdentDefs)
-  n.add newIdentNode("returnValuePtr")
-  var p = newNimNode(nnkPtrTy)
-  p.add newIdentNode("ZVal")
-  n.add p
-  n.add newEmptyNode()
-  prc[3].add n
-
-  n = newNimNode(nnkIdentDefs)
-  n.add newIdentNode("thisPtr")
-  n.add newIdentNode("ZVal")
-  n.add newEmptyNode()
-  prc[3].add n
-
-  n = newNimNode(nnkIdentDefs)
-  n.add newIdentNode("retvalUsed")
-  n.add newIdentNode("int")
-  n.add newEmptyNode()
-  prc[3].add n
+  prc[3].add newParam("ht","int")
+  prc[3].add newParam("returnValue","ZVal")
+  prc[3].add newPtrParam("returnValuePtr","ZVal")
+  prc[3].add newParam("thisPtr","ZVal")
+  prc[3].add newParam("retvalUsed","int")
 
   body.add prc[6]
   prc[6] = body
@@ -248,9 +235,10 @@ macro phpfunc*(prc: stmt): stmt {.immediate.} =
 #
 
 var zf*: seq[ZendFunctionEntry] = @[]
-var zm*: ZendModuleEntry # global allocated!
 
-proc get_module(): ptr ZendModuleEntry {.stdcall,exportc:"get_module",dynlib.} =
+var zm: ZendModuleEntry # global allocated!
+
+proc get_module(): ptr ZendModuleEntry {.stdcall,exportc,dynlib.} =
   result = zm.addr
 
 proc moduleStartup() {.stdcall.} =

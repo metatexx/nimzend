@@ -1,8 +1,9 @@
-import ospaths
-
 var extensionName = "nimext"
 
-include config_tpl
+include "../../src/cfgtpl.nims"
+
+# so that the example finds nimzend.nim even if not installed
+switch("p", "../../src/")
 
 task tests, "runs a simple test":
   setCommand "nop"

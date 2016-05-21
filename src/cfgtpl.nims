@@ -1,3 +1,12 @@
+import ospaths
+
+when not compiles(extensionName):
+  # this hack makes syntax checking of the file working in my IDE
+  when paramStr(1) == "check":
+    var extensionName = "check"
+  else:
+    {.error: "you need to declare the exensionName".}
+
 var phpver = gorge("php-config --vernum")[0..2]
 var extensionDir = gorge("php-config --extension-dir")
 var extensionFile = extensionDir / extensionName & ".so"
