@@ -1,7 +1,7 @@
 # nim build --verbosity:0
 # php greeter.php
 
-import nimzend
+import "../../src/nimzend.nim"
 
 proc nimgreeter(s: string) {.phpfunc.} =
   returnString "Hello " & s & "!"

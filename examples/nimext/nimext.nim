@@ -2,7 +2,7 @@
 # runphp dl("nimext.so"); echo nim_alpha("12H!e#0&ll3_o?").PHP_EOL;
 # runphp dl("nimext.so"); echo nim_fun(2.5, "Hello World!", " - ").PHP_EOL;
 
-import nimzend
+import "../../src/nimzend.nim"
 import math
 
 #
@@ -35,5 +35,10 @@ proc nim_alpha(str: string): string {.phpfunc.} =
         if ch in {'a'..'z', 'A'..'Z'}:
           result.add ch
 
+proc nim_zval(str: ZVal) {.phpfunc.} =
+  result = ""
+  for ch in str:
+        if ch in {'a'..'z', 'A'..'Z'}:
+          result.add ch
 
 finishExtension("nimext","0.1")

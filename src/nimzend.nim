@@ -135,7 +135,7 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
   var autoResult = prc[3][0]
 
   if not (autoResult.kind in {nnkEmpty, nnkIdent}):
-    error("phpfunc proc needs a void return value")
+    error("phpfunc proc needs a void return value but is " & autoResult.lispRepr)
 
   var body = newNimNode(nnkStmtList)
 
