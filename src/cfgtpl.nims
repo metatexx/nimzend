@@ -9,6 +9,9 @@ when not compiles(extensionName):
 
 var phpver = gorge("php-config --vernum")[0..2]
 var extensionDir = gorge("php-config --extension-dir")
+
+mkDir extensionDir
+
 var extensionFile = extensionDir / extensionName & ".so"
 
 task build, "builds the extension":

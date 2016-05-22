@@ -1,4 +1,5 @@
 # nim build --verbosity:0
+# runphp dl("nimext.so"); echo nim_zval("12\0"."3").PHP_EOL;
 # runphp dl("nimext.so"); echo nim_alpha("12H!e#0&ll3_o?").PHP_EOL;
 # runphp dl("nimext.so"); echo nim_fun(2.5, "Hello World!", " - ").PHP_EOL;
 
@@ -13,7 +14,7 @@ proc nim_fun(num: float, txt: string, sep: string = ",", tresh: float = 1.0, foo
   if notDiscarded:
     var r = ""
     var cnt = num.int
-    # just for fun
+    # just for funr
     if num.floor() != num:
       r.add "*"
 
@@ -35,10 +36,9 @@ proc nim_alpha(str: string): string {.phpfunc.} =
         if ch in {'a'..'z', 'A'..'Z'}:
           result.add ch
 
-proc nim_zval(str: ZVal) {.phpfunc.} =
-  result = ""
-  for ch in str:
-        if ch in {'a'..'z', 'A'..'Z'}:
-          result.add ch
+proc nim_zval(zv: ZVal) {.phpfunc.} =
+  echo zv.kind
+  echo zv.value.str.text
+  echo zv.value.str.len
 
 finishExtension("nimext","0.1")

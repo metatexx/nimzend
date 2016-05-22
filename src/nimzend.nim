@@ -2,12 +2,16 @@
 
 import macros
 
-when defined(php504):
+when defined(php503):
+  const ZEND_MODULE_API_NO = 20090626
+elif defined(php504):
   const ZEND_MODULE_API_NO = 20100525
-elif defined(php503):
-  const ZEND_MODULE_API_NO = 20090626
+elif defined(php505):
+  const ZEND_MODULE_API_NO = 20121212
+elif defined(php506):
+  const ZEND_MODULE_API_NO = 20131226
 else:
-  const ZEND_MODULE_API_NO = 20090626
+  const ZEND_MODULE_API_NO = 99999999
   #{.error:"You need to define the PHP version (php54 php53)".}
 
 type
@@ -85,6 +89,8 @@ proc emalloc*(size: int): pointer {.importc:"_emalloc".}
 proc efree*(mem: pointer) {.importc:"_efree".}
 proc estrdup*(txt: cstring): cstring {.importc:"_estrdup".}
 
+proc arrayInit*(arg: ZVal, size: int = 0) {.importc: "_array_init".}
+
 # Our Functions
 
 template returnString*(s) =
@@ -158,6 +164,15 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
           vargs = true
 
       case kind:
+        of "ZVal":
+          var tmp = "var " & vname & ": ZVal"
+          if default != nnkEmpty:
+            tmp.add " = " & $prc[3][i][2].intVal
+          body.add parseStmt tmp
+
+          fmt.add "z"
+          args.add ", " & vname & ".addr"
+
         of "int":
           var tmp = "var " & vname & ": int"
           if default != nnkEmpty:
