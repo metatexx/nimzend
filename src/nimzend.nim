@@ -210,6 +210,9 @@ when not defined(php700):
     result.add p
     result.add newEmptyNode()
 
+var
+  regs {.compileTime.}: NimNode
+
 proc zifProc(prc: NimNode): NimNode {.compileTime.} =
   #echo ht
   #echo cast[int](returnValue)
@@ -229,7 +232,7 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
 
   var autoResult = prc[3][0]
 
-  if not (autoResult.kind in {nnkEmpty, nnkIdent}):
+  if autoResult.kind notin {nnkEmpty, nnkIdent}:
     error("phpfunc proc needs a void return value but is " & autoResult.lispRepr)
 
   var body = newNimNode(nnkStmtList)
@@ -344,9 +347,13 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
   prc[6] = body
 
   result.add prc
-  result.add parseStmt("zf.add(ZendFunctionEntry(fname: \"" & phpName & "\", handler: " & zifName & "))")
+  if regs == nil: regs = newNimNode(nnkBracket)
+  template entry(a, b) =
+    ZendFunctionEntry(fname: a, handler: b)
+  regs.add(getAst(entry(newLit(phpName), newIdentNode zifName)))
+  #result.add parseStmt("zf.add(ZendFunctionEntry(fname: \"" & phpName & "\", handler: " & zifName & "))")
 
-macro phpfunc*(prc: stmt): stmt {.immediate.} =
+macro phpfunc*(prc: untyped): untyped {.immediate.} =
   # not sure about the nnkStmtList
   if prc.kind == nnkStmtList:
     error("phpfunc statement list?")
@@ -357,12 +364,7 @@ macro phpfunc*(prc: stmt): stmt {.immediate.} =
 # THE MAGIC aka MODULE
 #
 
-var zf*: seq[ZendFunctionEntry] = @[]
-
-var zm: ZendModuleEntry # global allocated!
-
-proc get_module(): ptr ZendModuleEntry {.stdcall,exportc,dynlib.} =
-  result = zm.addr
+#var zf*: seq[ZendFunctionEntry] = @[]
 
 proc moduleStartup() {.stdcall.} =
   discard
@@ -376,16 +378,31 @@ proc requestStartup() {.stdcall.} =
 proc requestShutdown() {.stdcall.} =
   discard
 
-proc finishExtension*(name, version: string) =
+macro funcArray(): untyped =
+  template entry(a, b) =
+    ZendFunctionEntry(fname: a, handler: b)
+  regs.add(getAst(entry(newNimNode(nnkNilLit), newNimNode(nnkNilLit))))
+  template fa(x) =
+    var funca {.global.} = x
+    unsafeAddr(funca[0])
+  result = getAst(fa(regs))
+  #echo repr result
+
+template finishExtension*(extname, extversion: string) =
   # build the Zend Module info
+  var zm {.global.}: ZendModuleEntry
+
+  proc get_module(): ptr ZendModuleEntry {.stdcall,exportc,dynlib.} =
+    result = zm.addr
+
   zm.size = ZendModuleEntry.sizeof.uint16
   zm.zend_api = ZEND_MODULE_API_NO
   zm.zend_debug = 0
   zm.zts = 0
   zm.ini_entry = nil
   zm.deps = nil
-  zm.name = name
-  zm.version = version
+  zm.name = extname
+  zm.version = extversion
   zm.build_id = "API" & $ZEND_MODULE_API_NO & ",NTS"
 
   zm.module_startup_func = moduleStartup
@@ -393,6 +410,6 @@ proc finishExtension*(name, version: string) =
   zm.request_startup_func = requestStartup
   zm.request_shutdown_func = requestShutdown
 
-  zm.functions = zf[0].addr
+  zm.functions = funcArray()
 
   assert(zm.size==168)
