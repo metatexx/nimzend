@@ -10,9 +10,114 @@ elif defined(php505):
   const ZEND_MODULE_API_NO = 20121212
 elif defined(php506):
   const ZEND_MODULE_API_NO = 20131226
+elif defined(php700):
+  const ZEND_MODULE_API_NO = 20151012
 else:
   const ZEND_MODULE_API_NO = 99999999
   #{.error:"You need to define the PHP version (php54 php53)".}
+
+when defined(php700):
+  #{.error: "PHP 7 not yet supported".}
+  type
+    ZendTypes* = enum
+      IS_UNDEF
+      IS_NULL
+      IS_FALSE
+      IS_TRUE
+      IS_LONG
+      IS_DOUBLE
+      IS_STRING
+      IS_ARRAY
+      IS_OBJECT
+      IS_RESOURCE
+      IS_REFERENCE
+
+    ZendTypeInfoUnion = object {.union.}
+      typeinfo: uint32
+
+    ZendRefcounted = object
+      refcount: uint32
+      u: ZendTypeInfoUnion
+
+    ZendStringObj = object
+      gc: ZendRefcounted
+      h: uint64 # string hash
+      len: int64
+      val: array[0..0, char]
+
+    ZendString = ptr ZendStringObj
+
+    ZendArrayObj = object # dummy
+
+    ZendArray = ptr ZendArrayObj
+
+    ZendValue = object {.union.}
+      lval: int64
+      dval: float64
+      str: ZendString
+      arr: ZendArray
+      ww: tuple[w1: uint32, w2: uint32]
+
+    ZValV = object {.packed.}
+      kind: uint8
+      kind_flags: uint8
+      const_flags: uint8
+      reserved: uint8
+
+    ZValU1 = object {.union.}
+      v: ZValV
+      type_info: uint32
+
+    ZValU2 = object {.union.}
+      next: uint32
+      num_args: uint32
+
+    ZValObj = object
+      value: ZendValue
+      u1: ZValU1
+      u2: ZValU2
+
+    ZVal* = ptr ZValObj
+
+    ZendExecuteDataObj = object
+      opline: pointer #const / executed opline
+      call: ptr ZendExecuteDataObj # current call
+      return_value: ZVal
+      fn: pointer #zend_function *func; # executed function
+      this: ZValObj # /* this + call_info + num_args
+      prev_execute_data: ptr ZendExecuteDataObj
+      symbol_table: ptr ZendArrayObj
+
+    ZendExecuteData* = ptr ZendExecuteDataObj
+
+else:
+  type
+    ZendTypes* = enum
+      IS_NULL
+      IS_LONG
+      IS_DOUBLE
+      IS_BOOL
+      IS_ARRAY
+      IS_OBJECT
+      IS_STRING
+      IS_RESOURCE
+      IS_CONSTANT
+      IS_CONSTANT_ARRAY
+      IS_CALLABLE
+
+    ZendValue = object {.union.}
+      long: int64
+      str: tuple[text: cstring, len: int64]
+
+    ZValObj* = object
+      value: ZendValue
+      refcountGC: uint32
+      kind: uint8
+      isRefGc: uint8
+
+    ZVal* = ptr ZValObj
+    #ZendExecuteDataObj* = object
+    #ZendExecuteData* = ptr ZendExecuteDataObj
 
 type
   ZendModuleEntry* = object # not {.packed.} !
@@ -48,36 +153,6 @@ type
     num_args: uint32
     flags: uint32
 
-  ZendExecuteDataObj = object
-    nix: pointer
-
-  ZendExecuteData* = ptr ZendExecuteDataObj
-
-  ZendTypes* = enum
-    IS_NULL
-    IS_LONG
-    IS_DOUBLE
-    IS_BOOL
-    IS_ARRAY
-    IS_OBJECT
-    IS_STRING
-    IS_RESOURCE
-    IS_CONSTANT
-    IS_CONSTANT_ARRAY
-    IS_CALLABLE
-
-  ZendValue = object {.union.}
-    long: int64
-    str: tuple[text: cstring, len: int64]
-
-  ZValObj* = object #{.packed.}
-    value: ZendValue
-    refcountGC: uint32
-    kind: uint8
-    isRefGc: uint8
-
-  ZVal* = ptr ZValObj
-
 converter zendTypes*(x: ZendTypes): uint8 = x.uint8
 
 # zend functions
@@ -93,16 +168,29 @@ proc arrayInit*(arg: ZVal, size: int = 0) {.importc: "_array_init".}
 
 # Our Functions
 
-template returnString*(s) =
-  returnValue.value.str.text = estrdup(s)
-  returnValue.value.str.len = s.len
-  returnValue.kind = IS_STRING
-  return
+when defined(php700):
+  template returnString*(s) =
+    #returnValue.value.str.val = estrdup(s)
+    #returnValue.value.str.len = s.len
+    #returnValue.kind = IS_STRING
+    return
 
-template returnLong*(s) =
-  returnValue.value.long = s
-  returnValue.kind = IS_LONG
-  return
+  template returnLong*(s) =
+    returnValue.value.lval = s
+    returnValue.u1.v.kind = IS_LONG
+    return
+
+else:
+  template returnString*(s) =
+    returnValue.value.str.text = estrdup(s)
+    returnValue.value.str.len = s.len
+    returnValue.kind = IS_STRING
+    return
+
+  template returnLong*(s) =
+    returnValue.value.long = s
+    returnValue.kind = IS_LONG
+    return
 
 template notDiscarded*(): bool =
   (retval_used == 1)
@@ -113,13 +201,14 @@ proc newParam(name: string, kind: string): NimNode {.compiletime.} =
   result.add newIdentNode(kind)
   result.add newEmptyNode()
 
-proc newPtrParam(name: string, kind: string): NimNode {.compiletime.} =
-  result = newNimNode(nnkIdentDefs)
-  result.add newIdentNode(name)
-  var p = newNimNode(nnkPtrTy)
-  p.add newIdentNode(kind)
-  result.add p
-  result.add newEmptyNode()
+when not defined(php700):
+  proc newPtrParam(name: string, kind: string): NimNode {.compiletime.} =
+    result = newNimNode(nnkIdentDefs)
+    result.add newIdentNode(name)
+    var p = newNimNode(nnkPtrTy)
+    p.add newIdentNode(kind)
+    result.add p
+    result.add newEmptyNode()
 
 proc zifProc(prc: NimNode): NimNode {.compileTime.} =
   #echo ht
@@ -220,7 +309,10 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
         else:
           error("Parameter Type '" & $kind & "' not supported")
 
-    body.add parseStmt("discard zend_parse_parameters(ht, \"" & fmt & "\" " & args & ")")
+    when defined(php700):
+      body.add parseStmt("discard zend_parse_parameters(execute_data.this.u2.numArgs.int, \"" & fmt & "\" " & args & ")")
+    else:
+      body.add parseStmt("discard zend_parse_parameters(ht, \"" & fmt & "\" " & args & ")")
 
     for fix in fixs:
       body.add parseStmt(fix)
@@ -228,18 +320,22 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
   prc[3] = newNimNode(nnkFormalParams)
   prc[3].add copyNimNode(autoResult)
 
-  prc[3].add newParam("ht","int")
-  prc[3].add newParam("returnValue","ZVal")
-  prc[3].add newPtrParam("returnValuePtr","ZVal")
-  prc[3].add newParam("thisPtr","ZVal")
-  prc[3].add newParam("retvalUsed","int")
+  when defined(php700):
+    prc[3].add newParam("execute_data","ZendExecuteData")
+    prc[3].add newParam("returnValue","ZVal")
+  else:
+    prc[3].add newParam("ht","int")
+    prc[3].add newParam("returnValue","ZVal")
+    prc[3].add newPtrParam("returnValuePtr","ZVal")
+    prc[3].add newParam("thisPtr","ZVal")
+    prc[3].add newParam("retvalUsed","int")
 
   body.add prc[6]
 
   # works only for implicit returns (needs to scan body otherwise)
   if autoResult.kind == nnkIdent:
     case $autoResult.ident:
-      of "int": body.add parseStmt("returnLong resukt")
+      of "int": body.add parseStmt("returnLong result")
       of "string": body.add parseStmt("returnString result")
       of "float": body.add parseStmt("returnFloat result")
       of "bool": body.add parseStmt("returnFloat bool")
