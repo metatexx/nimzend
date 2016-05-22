@@ -8,4 +8,4 @@ switch("d", "release")
 
 task tests, "runs a simple test":
   setCommand "nop"
-  exec """php -r 'dl("""" & extensionName & """.so");  echo ">".nim_long()."<".PHP_EOL;'"""
+  exec """php -r 'dl("""" & extensionName & """.so");  echo ">".nim_add(123, 111)."<".PHP_EOL;'"""
