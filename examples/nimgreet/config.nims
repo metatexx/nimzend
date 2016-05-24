@@ -10,4 +10,4 @@ switch("p", "../../src/")
 # our tests
 task tests, "runs a simple test":
   setCommand "nop"
-  exec """php greeter.php"""
+  exec phpExe & """ greeter.php"""

@@ -12,9 +12,10 @@ elif defined(php506):
   const ZEND_MODULE_API_NO = 20131226
 elif defined(php700):
   const ZEND_MODULE_API_NO = 20151012
-else:
+elif defined(nimcheck):
   const ZEND_MODULE_API_NO = 99999999
-  #{.error:"You need to define the PHP version (php54 php53)".}
+else:
+  {.error:"You need to define the PHP version (php54 php53)".}
 
 when defined(php700):
   #{.error: "PHP 7 not yet supported".}
@@ -107,6 +108,7 @@ else:
 
     ZendValue = object {.union.}
       long: int64
+      dval: float64
       str: tuple[text: cstring, len: int64]
 
     ZValObj* = object
@@ -180,6 +182,11 @@ when defined(php700):
     returnValue.u1.v.kind = IS_LONG
     return
 
+  template returnFloat*(s) =
+    returnValue.value.dval = s
+    returnValue.u1.v.kind = IS_DOUBLE
+    return
+
 else:
   template returnString*(s) =
     returnValue.value.str.text = estrdup(s)
@@ -190,6 +197,11 @@ else:
   template returnLong*(s) =
     returnValue.value.long = s
     returnValue.kind = IS_LONG
+    return
+
+  template returnFloat*(s) =
+    returnValue.value.dval = s
+    returnValue.kind = IS_DOUBLE
     return
 
 template notDiscarded*(): bool =
@@ -298,8 +310,8 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
           var help_s = "zifq" & $i & "s_" & vname
           var help_l = "zifq" & $i & "l_" & vname
 
-          body.add parseStmt "var " & vname & ": string"
-          body.add parseStmt "var " & help_s & ": cstring"
+          body.add parseStmt "var " & vname & ":string"
+          body.add parseStmt "var " & help_s & ":cstring"
           body.add parseStmt "var " & help_l & ":ptr int64"
           fmt.add "s"
           args.add  ", " & help_s & ".addr, " & help_l & ".addr"
@@ -363,8 +375,6 @@ macro phpfunc*(prc: untyped): untyped {.immediate.} =
 #
 # THE MAGIC aka MODULE
 #
-
-#var zf*: seq[ZendFunctionEntry] = @[]
 
 proc moduleStartup() {.stdcall.} =
   discard

@@ -1,4 +1,4 @@
-# nim build --verbosity:0
+# nim build --verbosity:1 --hints:off
 # runphp dl("nimext.so"); echo nim_zval("12\0"."3").PHP_EOL;
 # runphp dl("nimext.so"); echo nim_alpha("12H!e#0&ll3_o?").PHP_EOL;
 # runphp dl("nimext.so"); echo nim_fun(2.5, "Hello World!", " - ").PHP_EOL;
