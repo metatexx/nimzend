@@ -1,6 +1,7 @@
 # nim build -d:phpinfo --verbosity:1 --hints:off
-# runphp7 dl("nim7.so"); echo ">".nim_say("Hello!")."<".PHP_EOL;
-# runphp7 dl("nim7.so"); echo ">".nim_add(123, 111)."<".PHP_EOL;
+# run nim tests
+# !run php7r dl("nim7.so"); echo ">".nim_say("Hello!")."<".PHP_EOL;
+# !run php7r dl("nim7.so"); echo ">".nim_add(123, 111)."<".PHP_EOL;
 
 import "../../src/nimzend.nim"
 

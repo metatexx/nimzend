@@ -376,6 +376,8 @@ macro phpfunc*(prc: untyped): untyped {.immediate.} =
 # THE MAGIC aka MODULE
 #
 
+#proc NimMainInit() {.importc.}
+
 proc moduleStartup() {.stdcall.} =
   discard
 
@@ -386,7 +388,10 @@ proc requestStartup() {.stdcall.} =
   discard
 
 proc requestShutdown() {.stdcall.} =
-  discard
+  when not defined(nimcheck):
+    deallocAll()
+  else:
+    discard
 
 macro funcArray(): untyped =
   template entry(a, b) =

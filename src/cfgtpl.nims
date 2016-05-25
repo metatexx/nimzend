@@ -36,7 +36,10 @@ var extensionFile = extensionDir / extensionName & ".so"
 task build, "builds the extension":
   setCommand "c"
   switch("app", "lib")
-  switch("d", "phpext")
+  switch("d", "nimphpext")
+  switch("threads","on")
+  switch("d","noSignalHandler")
+  switch("gc", "stack") # using the gc:stack of Nim
 
   when defined(macosx):
     switch("l", "-undefined suppress -flat_namespace")

@@ -1,5 +1,5 @@
 # nim build --verbosity:0
-# php greeter.php
+# run nim tests
 
 import "../../src/nimzend.nim"
 
