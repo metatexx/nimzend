@@ -35,11 +35,17 @@ var extensionFile = extensionDir / extensionName & ".so"
 
 task build, "builds the extension":
   setCommand "c"
+
   switch("app", "lib")
   switch("d", "nimphpext")
   switch("threads","on")
   switch("d","noSignalHandler")
   switch("gc", "stack") # using the gc:stack of Nim
+
+  # We mangle names (but thats just a hack so far)
+  switch("passC","-DNimMain=NimMain" & extensionName)
+  switch("passC","-DNimMainInit=NimMain" & extensionName & "Init")
+  switch("passC","-DNimMainInner=NimMain" & extensionName & "Inner")
 
   when defined(macosx):
     switch("l", "-undefined suppress -flat_namespace")
