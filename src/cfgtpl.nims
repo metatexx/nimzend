@@ -43,14 +43,9 @@ task build, "builds the extension":
   switch("d","noSignalHandler")
   switch("gc", "stack") # using the gc:stack of Nim
 
-  # We mangle names (but thats just a hack so far)
-  switch("passC","-DNimMain=NimMain" & extensionName)
-  switch("passC","-DNimMainInit=NimMain" & extensionName & "Init")
-  switch("passC","-DNimMainInner=NimMain" & extensionName & "Inner")
-
   when defined(macosx):
-    switch("l", "-undefined suppress -flat_namespace")
-    # -dynamic -fno-common -DPIC -install_name " & extensionDir / extensionName & ".so")
+    switch("l", "-undefined dynamic_lookup")
+    #switch("l", "-undefined suppress -flat_namespace")
   elif defined(posix):
     switch("l", "-undefined")
   else:

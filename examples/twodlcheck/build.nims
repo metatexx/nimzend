@@ -1,3 +1,4 @@
+# nim build
 task build, "Builds and runs":
   echo "Building nimdl1.nim"
   echo gorge("nim build --verbosity:1 nimdl1.nim 2>&1")
