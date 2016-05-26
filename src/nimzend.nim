@@ -388,7 +388,7 @@ proc requestStartup() {.stdcall.} =
   discard
 
 proc requestShutdown() {.stdcall.} =
-  when not defined(nimcheck):
+  when defined(gcstack):
     deallocAll()
   else:
     discard
