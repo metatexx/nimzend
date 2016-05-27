@@ -20,7 +20,7 @@ else:
 when defined(php700):
   #{.error: "PHP 7 not yet supported".}
   type
-    ZendTypes* = enum
+    ZendTypes* {.size: sizeof(uint8).} = enum
       IS_UNDEF
       IS_NULL
       IS_FALSE
@@ -34,11 +34,11 @@ when defined(php700):
       IS_REFERENCE
 
     ZendTypeInfoV = object
-      kind: uint8
+      kind: ZendTypes
       flags: uint8
       gc_info: uint16
 
-    ZendTypeInfoFlags = enum
+    ZendTypeInfoFlags* = enum
       IS_STR_PERSISTENT = 1 # allocated using malloc
       IS_STR_INTERNED = 2   # interned string
       IS_STR_PERMANENT = 4  # interned string surviving request boundary
@@ -82,12 +82,12 @@ when defined(php700):
       ww: tuple[w1: uint32, w2: uint32]
 
     ZValV = object {.packed.}
-      kind: uint8
+      kind: ZendTypes
       kind_flags: uint8
       const_flags: uint8
       reserved: uint8
 
-    ZValU1Types = enum
+    ZValU1Types* = enum
       IS_TYPE_CONSTANT = 1
       IS_TYPE_IMMUTABLE = 2
       IS_TYPE_REFCOUNTED = 4
@@ -126,11 +126,9 @@ when defined(php700):
 
     ZendExecuteData* = ptr ZendExecuteDataObj
 
-  converter zvalU1Types*(x: ZValU1Types): uint32 = x.uint32
-
 else:
   type
-    ZendTypes* = enum
+    ZendTypes* {.size: sizeof(uint8).} = enum
       IS_NULL
       IS_LONG
       IS_DOUBLE
@@ -151,7 +149,7 @@ else:
     ZValObj* = object
       value: ZendValue
       refcountGC: uint32
-      kind: uint8
+      kind: ZendTypes
       isRefGc: uint8
 
     ZVal* = ptr ZValObj
@@ -191,8 +189,6 @@ type
     arg_info: pointer #const struct _zend_internal_arg_info *arg_info;
     num_args: uint32
     flags: uint32
-
-converter zendTypes*(x: ZendTypes): uint8 = x.uint8
 
 # zend functions
 
@@ -236,7 +232,7 @@ when defined(php700):
     if persistent:
       v.value.str.gc.u.v.flags = IS_STR_PERSISTENT.uint8
     else:
-      v.value.str.gc.u.type_info = IS_TYPE_REFCOUNTED
+      v.value.str.gc.u.type_info = IS_TYPE_REFCOUNTED.uint32
     v.value.str.gc.u.v.kind = v.u1.v.kind
 
   proc createZendString*(v: ZVal, s: string, n: int, persistent: bool = false) {.inline.} =
@@ -251,7 +247,7 @@ when defined(php700):
     if persistent:
       v.value.str.gc.u.v.flags = IS_STR_PERSISTENT.uint8
     else:
-      v.value.str.gc.u.type_info = IS_TYPE_REFCOUNTED
+      v.value.str.gc.u.type_info = IS_TYPE_REFCOUNTED.uint32
     v.value.str.gc.u.v.kind = v.u1.v.kind
 
   template returnString*(s) =
