@@ -23,7 +23,7 @@ switch("d", "release")
 
 task tests, "runs a simple test":
   setCommand "nop"
-  exec phpExe & " tests.php"
+  exec phpExe & " tests.php 2>&1"
 
 # following does not work (yet)
 task all, "builds and runs":

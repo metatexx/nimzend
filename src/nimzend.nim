@@ -33,15 +33,26 @@ when defined(php700):
       IS_RESOURCE
       IS_REFERENCE
 
-    ZendTypeInfoUnion = object {.union.}
-      typeinfo: uint32
+    ZendTypeInfoV = object
+      kind: uint8
+      flags: uint8
+      gc_info: uint16
 
-    ZendRefcounted = object
+    ZendTypeInfoFlags = enum
+      IS_STR_PERSISTENT = 1 # allocated using malloc
+      IS_STR_INTERNED = 2   # interned string
+      IS_STR_PERMANENT = 4  # interned string surviving request boundary
+
+    ZendTypeInfoUnion = object {.union.}
+      type_info: uint32
+      v: ZendTypeInfoV
+
+    ZendRefcountedObj = object
       refcount: uint32
       u: ZendTypeInfoUnion
 
     ZendStringObj = object
-      gc: ZendRefcounted
+      gc: ZendRefcountedObj
       h: uint64 # string hash
       len: int64
       val: array[0..0, char]
@@ -52,11 +63,22 @@ when defined(php700):
 
     ZendArray = ptr ZendArrayObj
 
+    ZendObjectObj = object # dummy
+
+    ZendObject = ptr ZendObjectObj
+
     ZendValue = object {.union.}
       lval: int64
       dval: float64
+      counted: ptr ZendRefcountedObj
       str: ZendString
       arr: ZendArray
+      obj: ZendObject
+      `ref`: pointer
+      ast: pointer
+
+      zv: ZVal
+      `ptr`: pointer
       ww: tuple[w1: uint32, w2: uint32]
 
     ZValV = object {.packed.}
@@ -65,13 +87,26 @@ when defined(php700):
       const_flags: uint8
       reserved: uint8
 
+    ZValU1Types = enum
+      IS_TYPE_CONSTANT = 1
+      IS_TYPE_IMMUTABLE = 2
+      IS_TYPE_REFCOUNTED = 4
+      IS_TYPE_COLLECTABLE = 8
+      IS_TYPE_COPYABLE = 16
+      IS_TYPE_SYMBOLTABLE = 32
+
     ZValU1 = object {.union.}
       v: ZValV
       type_info: uint32
 
     ZValU2 = object {.union.}
-      next: uint32
-      num_args: uint32
+      var_flags: uint32
+      next: uint32        # hash collision chain
+      cache_slot: uint32   # literal cache slot
+      lineno: uint32      # line number (for ast nodes)
+      num_args: uint32    # arguments number for EX(this)
+      fe_pos: uint32      # foreach position
+      fe_iter_idx: uint32 # foreach iterator index
 
     ZValObj = object
       value: ZendValue
@@ -90,6 +125,8 @@ when defined(php700):
       symbol_table: ptr ZendArrayObj
 
     ZendExecuteData* = ptr ZendExecuteDataObj
+
+  converter zvalU1Types*(x: ZValU1Types): uint32 = x.uint32
 
 else:
   type
@@ -162,20 +199,64 @@ converter zendTypes*(x: ZendTypes): uint8 = x.uint8
 proc zend_zval_type_name*(arg: ZVal): cstring {.stdcall,importc.}
 proc zend_parse_parameters*(num: int, format: cstring): int {.importc: "zend_parse_parameters", varargs.}
 
+proc zend_malloc*(size: int): pointer {.importc:"_zend_malloc".}
+proc zend_free*(size: int): pointer {.importc:"_zend_free".}
+
 proc emalloc*(size: int): pointer {.importc:"_emalloc".}
 proc efree*(mem: pointer) {.importc:"_efree".}
 proc estrdup*(txt: cstring): cstring {.importc:"_estrdup".}
 
+proc zend_hash_func*(str: cstring, len: int64): uint64 {.importc:"zend_hash_func".}
+
+template pemalloc*(size: int, persistent: bool): pointer =
+  if persistent: zend_malloc(size) else: emalloc(size)
+
 proc arrayInit*(arg: ZVal, size: int = 0) {.importc: "_array_init".}
 
-# Our Functions
+const eightint = sizeof(int) * 8
+
+template ZendMMAlignment*(s: int): int =
+  (((s) + eightint) and not (eightint - 1))
+
+#echo ZendMMAlignment(65)
 
 when defined(php700):
+  proc allocZendString(size: int, persistent: bool): ZendString =
+    cast[ZendString](pemalloc(ZendMMAlignment(size + sizeof(ZendStringObj)), persistent))
+
+  # Our Functions
+  proc createZendString*(v: ZVal, s: string, persistent: bool = false) {.inline.} =
+    v.value.str = allocZendString(s.len(), persistent)
+    copyMem(v.value.str.val[0].addr,s.cstring,s.len+1)
+
+    v.value.str.len = s.len
+    v.u1.v.kind = IS_STRING
+    v.value.str.gc.refcount = 0
+    v.value.str.h = zend_hash_func(v.value.str.val[0].addr, v.value.str.len)
+    if persistent:
+      v.value.str.gc.u.v.flags = IS_STR_PERSISTENT.uint8
+    else:
+      v.value.str.gc.u.type_info = IS_TYPE_REFCOUNTED
+    v.value.str.gc.u.v.kind = v.u1.v.kind
+
+  proc createZendString*(v: ZVal, s: string, n: int, persistent: bool = false) {.inline.} =
+    v.value.str = allocZendString(s.len(), persistent)
+    copyMem(v.value.str.val[0].addr,s.cstring,n)
+    cast[ptr char](cast[int](v.value.str.val[0].addr)+n+1)[]='\0'
+
+    v.value.str.len = s.len
+    v.u1.v.kind = IS_STRING
+    v.value.str.gc.refcount = 0
+    v.value.str.h = zend_hash_func(v.value.str.val[0].addr, n)
+    if persistent:
+      v.value.str.gc.u.v.flags = IS_STR_PERSISTENT.uint8
+    else:
+      v.value.str.gc.u.type_info = IS_TYPE_REFCOUNTED
+    v.value.str.gc.u.v.kind = v.u1.v.kind
+
   template returnString*(s) =
-    #returnValue.value.str.val = estrdup(s)
-    #returnValue.value.str.len = s.len
-    #returnValue.kind = IS_STRING
-    return
+      createZendString(returnValue, s)
+      return
 
   template returnLong*(s) =
     returnValue.value.lval = s
@@ -185,6 +266,10 @@ when defined(php700):
   template returnFloat*(s) =
     returnValue.value.dval = s
     returnValue.u1.v.kind = IS_DOUBLE
+    return
+
+  template returnArray*(s) =
+    #_array_init((arg), 0
     return
 
 else:
