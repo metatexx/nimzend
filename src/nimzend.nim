@@ -223,6 +223,12 @@ type
     num_args: uint32
     flags: uint32
 
+# pseudo types for parameters
+
+type
+  ZValArray* = distinct ZVal
+  ZValArrayS* = ZVal
+
 # zend functions
 
 proc zend_zval_type_name*(arg: ZVal): cstring {.stdcall,importc.}
@@ -238,25 +244,30 @@ proc estrdup*(txt: cstring): cstring {.importc:"_estrdup".}
 proc zend_hash_func*(str: cstring, len: int64): uint64 {.importc:"zend_hash_func".}
 
 # ZendArray
-proc zend_array_init*(arg: ZVal, size: uint32 = 0): int {.importc:"_array_init".}
+proc array_init*(arg: ZValArray, size: uint32 = 0): int {.importc:"_array_init".}
 
-proc zend_add_assoc_long*(arg: ZVal, key: cstring, key_len: int, n: int64): int {.importc:"add_assoc_long_ex".}
-proc zend_add_assoc_null*(arg: ZVal, key: cstring, key_len: int): int {.importc:"add_assoc_null_ex".}
-proc zend_add_assoc_str*(arg: ZVal, key: cstring, key_len: int, str: ZVal): int {.importc:"add_assoc_str_ex".}
-proc zend_add_assoc_string*(arg: ZVal, key: cstring, key_len: int, str: cstring): int {.importc:"add_assoc_string_ex".}
-proc zend_add_assoc_stringl*(arg: ZVal, key: cstring, key_len: int, str: cstring, len: int): int {.importc:"add_assoc_stringl_ex".}
+proc add_assoc_long*(arg: ZValArray, key: cstring, key_len: int, n: int64): int {.importc:"add_assoc_long_ex".}
+proc add_assoc_null*(arg: ZValArray, key: cstring, key_len: int): int {.importc:"add_assoc_null_ex".}
+#proc add_assoc_str*(arg: ZValArray, key: cstring, key_len: int, str: ZVal): int {.importc:"add_assoc_str_ex".}
+proc add_assoc_string*(arg: ZValArray, key: cstring, key_len: int, str: cstring): int {.importc:"add_assoc_string_ex".}
+proc add_assoc_stringl*(arg: ZValArray, key: cstring, key_len: int, str: cstring, len: int): int {.importc:"add_assoc_stringl_ex".}
 
-proc zend_add_index_long*(arg: ZVal, idx: uint64, n: int64): int {.importc:"add_index_long".}
-proc zend_add_index_null*(arg: ZVal, idx: uint64): int {.importc:"add_index_null".}
-proc zend_add_index_str*(arg: ZVal, idx: uint64, str: ZendString): int {.importc:"add_index_str".}
-proc zend_add_index_string*(arg: ZVal, idx: uint64, str: cstring): int {.importc:"add_index_string".}
-proc zend_add_index_stringl*(arg: ZVal, idx: uint64, str: cstring, len: int): int {.importc:"add_index_stringl".}
-proc zend_add_index_zval*(arg: ZVal, idx: uint64, str: ZVal): int {.importc:"add_index_zval".}
+proc add_index_long*(arg: ZValArray, idx: uint64, n: int64): int {.importc:"add_index_long".}
+proc add_index_null*(arg: ZValArray, idx: uint64): int {.importc:"add_index_null".}
+proc add_index_str*(arg: ZValArray, idx: uint64, str: ZendString): int {.importc:"add_index_str".}
+proc add_index_string*(arg: ZValArray, idx: uint64, str: cstring): int {.importc:"add_index_string".}
+proc add_index_stringl*(arg: ZValArray, idx: uint64, str: cstring, len: int): int {.importc:"add_index_stringl".}
+proc add_index_zval*(arg: ZValArray, idx: uint64, str: ZVal): int {.importc:"add_index_zval".}
+
+proc add_next_index_long*(arg: ZValArray, n: int64): int {.importc:"add_next_index_long".}
+proc add_next_index_null*(arg: ZValArray): int {.importc:"add_next_index_null".}
+#proc add_next_index_str*(arg: ZValArray, str: ZendString): int {.importc:"add_next_index_str".}
+proc add_next_index_string*(arg: ZValArray, str: cstring): int {.importc:"add_next_index_string".}
+proc add_next_index_stringl*(arg: ZValArray, str: cstring, len: int): int {.importc:"add_next_index_stringl".}
+proc add_next_index_zval*(arg: ZValArray, str: ZVal): int {.importc:"add_next_index_zval".}
 
 template pemalloc*(size: int, persistent: bool): pointer =
   if persistent: zend_malloc(size) else: emalloc(size)
-
-proc arrayInit*(arg: ZVal, size: int = 0) {.importc: "_array_init".}
 
 const eightint = sizeof(int) * 8
 
@@ -272,40 +283,27 @@ when defined(php700):
   template notDiscarded*(): bool =
     true # for now
 
-  proc allocZendString(size: int, persistent: bool): ZendString =
-    cast[ZendString](pemalloc(ZendMMAlignment(size + sizeof(ZendStringObj)), persistent))
+  template zendStringInit(s: string, persistent: bool = false): ZendString =
+    zendStringInit(s, s.len, persistent)
+
+  proc zendStringInit(s: string, len: int, persistent: bool = false): ZendString =
+    result = cast[ZendString](pemalloc(ZendMMAlignment(len + sizeof(ZendStringObj)), persistent))
+    copyMem(result.val[0].addr,s.cstring,len)
+    cast[ptr char](cast[int](result.val[0].addr)+len+1)[]='\0'
+    result.len = s.len
+    result.gc.refcount = 0
+    result.gc.u.v.kind = IS_STRING
+    result.h = zend_hash_func(result.val[0].addr, result.len)
+    if persistent:
+      result.gc.u.v.flags = IS_STR_PERSISTENT.uint8
+    else:
+      result.gc.u.type_info = IS_TYPE_REFCOUNTED.uint32 + IS_TYPE_COPYABLE.uint32
 
   # Our Functions
-  proc zvalZendString*(v: ZVal, s: string, persistent: bool = false) {.inline.} =
-    v.value.str = allocZendString(s.len(), persistent)
-    copyMem(v.value.str.val[0].addr,s.cstring,s.len+1)
-
-    v.value.str.len = s.len
+  proc zvalZendString*(v: ZVal, s: string, n: int = 0, persistent: bool = false) {.inline.} =
+    v.value.str = zendStringInit(s, persistent)
     v.u1.v.kind = IS_STRING
-    v.value.str.gc.refcount = 0
-    v.value.str.h = zend_hash_func(v.value.str.val[0].addr, v.value.str.len)
-    if persistent:
-      v.value.str.gc.u.v.flags = IS_STR_PERSISTENT.uint8
-    else:
-      v.value.str.gc.u.type_info = IS_TYPE_REFCOUNTED.uint32
-    v.value.str.gc.u.v.kind = v.u1.v.kind
-
-  proc zvalZendString*(v: ZVal, s: string, n: int, persistent: bool = false) {.inline.} =
-    v.value.str = allocZendString(s.len(), persistent)
-    copyMem(v.value.str.val[0].addr,s.cstring,n)
-    cast[ptr char](cast[int](v.value.str.val[0].addr)+n+1)[]='\0'
-
-    v.value.str.len = s.len
-    v.u1.v.kind = IS_STRING
-    v.value.str.gc.refcount = 0
-    v.value.str.h = zend_hash_func(v.value.str.val[0].addr, n)
-    if persistent:
-      v.value.str.gc.u.v.flags = IS_STR_PERSISTENT.uint8
-      v.u1.v.kind_flags = IS_STR_PERSISTENT.uint8
-    else:
-      v.u1.v.kind_flags = IS_TYPE_REFCOUNTED.uint8 + IS_TYPE_COPYABLE.uint8
-      v.value.str.gc.u.type_info = IS_TYPE_REFCOUNTED.uint32 + IS_TYPE_COPYABLE.uint32
-    v.value.str.gc.u.v.kind = v.u1.v.kind
+    v.u1.v.kind_flags = v.value.str.gc.u.v.flags
 
   proc zvalLong*(z: ZVal, v: int64) {.inline.} =
     z.value.lval = v
@@ -424,10 +422,28 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
         of "ZVal":
           var tmp = "var " & vname & ": ZVal"
           if default != nnkEmpty:
-            tmp.add " = " & $prc[3][i][2].intVal
+            error("Default parameters for ZVal not possible")
           body.add parseStmt tmp
 
           fmt.add "z"
+          args.add ", " & vname & ".addr"
+
+        of "ZValArrayS":
+          var tmp = "var " & vname & ": ZVal"
+          if default != nnkEmpty:
+            error("Default parameters for Array not implemented")
+          body.add parseStmt tmp
+
+          fmt.add "a/"
+          args.add ", " & vname & ".addr"
+
+        of "ZValArray":
+          var tmp = "var " & vname & ": ZVal"
+          if default != nnkEmpty:
+            error("Default parameters for Array not implemented")
+          body.add parseStmt tmp
+
+          fmt.add "a"
           args.add ", " & vname & ".addr"
 
         of "int":
