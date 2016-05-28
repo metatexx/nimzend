@@ -269,28 +269,31 @@ proc estrdup*(txt: cstring): cstring {.importc:"_estrdup".}
 proc zend_hash_func*(str: cstring, len: int64): uint64 {.importc:"zend_hash_func".}
 
 # ZendArray
-proc array_init*(arg: ZValArray, size: uint32 = 0): int {.importc:"_array_init".}
+proc array_init*(arg: ZValArray, size: uint32 = 0): int {.discardable,importc:"_array_init".}
 
-proc add_assoc_long*(arg: ZValArray, key: cstring, key_len: int, n: int64): int {.importc:"add_assoc_long_ex".}
-proc add_assoc_null*(arg: ZValArray, key: cstring, key_len: int): int {.importc:"add_assoc_null_ex".}
-#proc add_assoc_str*(arg: ZValArray, key: cstring, key_len: int, str: ZVal): int {.importc:"add_assoc_str_ex".}
-proc add_assoc_string*(arg: ZValArray, key: cstring, key_len: int, str: cstring): int {.importc:"add_assoc_string_ex".}
-proc add_assoc_stringl*(arg: ZValArray, key: cstring, key_len: int, str: cstring, len: int): int {.importc:"add_assoc_stringl_ex".}
+proc add_assoc_long*(arg: ZValArray, key: cstring, key_len: int, n: int64): int {.discardable,importc:"add_assoc_long_ex".}
+proc add_assoc_double*(arg: ZValArray, key: cstring, key_len: int, n: float64): int {.discardable,importc:"add_assoc_double_ex".}
+proc add_assoc_bool*(arg: ZValArray, key: cstring, key_len: int, n: bool): int {.discardable,importc:"add_assoc_bool_ex".}
+proc add_assoc_null*(arg: ZValArray, key: cstring, key_len: int): int {.discardable,importc:"add_assoc_null_ex".}
+proc add_assoc_string*(arg: ZValArray, key: cstring, key_len: int, str: cstring): int {.discardable,importc:"add_assoc_string_ex".}
+proc add_assoc_stringl*(arg: ZValArray, key: cstring, key_len: int, str: cstring, len: int): int {.discardable,importc:"add_assoc_stringl_ex".}
+proc add_assoc_zval*(arg: ZValArray, key: cstring, key_len: int, val: ZVal): int {.discardable,importc:"add_assoc_stringl_ex".}
 
-proc add_index_long*(arg: ZValArray, idx: uint64, n: int64): int {.importc:"add_index_long".}
-proc add_index_null*(arg: ZValArray, idx: uint64): int {.importc:"add_index_null".}
-proc add_index_str*(arg: ZValArray, idx: uint64, str: ZendString): int {.importc:"add_index_str".}
-proc add_index_string*(arg: ZValArray, idx: uint64, str: cstring): int {.importc:"add_index_string".}
-proc add_index_stringl*(arg: ZValArray, idx: uint64, str: cstring, len: int): int {.importc:"add_index_stringl".}
-proc add_index_zval*(arg: ZValArray, idx: uint64, str: ZVal): int {.importc:"add_index_zval".}
+proc add_index_long*(arg: ZValArray, idx: uint64, n: int64): int {.discardable,importc:"add_index_long".}
+proc add_index_bool*(arg: ZValArray, idx: uint64, n: bool): int {.discardable,importc:"add_index_bool".}
+proc add_index_double*(arg: ZValArray, idx: uint64, n: float64): int {.discardable,importc:"add_index_double".}
+proc add_index_null*(arg: ZValArray, idx: uint64): int {.discardable,importc:"add_index_null".}
+proc add_index_string*(arg: ZValArray, idx: uint64, str: cstring): int {.discardable,importc:"add_index_string".}
+proc add_index_stringl*(arg: ZValArray, idx: uint64, str: cstring, len: int): int {.discardable,importc:"add_index_stringl".}
+proc add_index_zval*(arg: ZValArray, idx: uint64, str: ZVal): int {.discardable,importc:"add_index_zval".}
 
-proc add_next_index_long*(arg: ZValArray, n: int64): int {.importc:"add_next_index_long".}
-proc add_next_index_double*(arg: ZValArray, n: float64): int {.importc:"add_next_index_double".}
+proc add_next_index_long*(arg: ZValArray, n: int64): int {.discardable,importc:"add_next_index_long".}
+proc add_next_index_double*(arg: ZValArray, n: float64): int {.discardable,importc:"add_next_index_double".}
+proc add_next_index_bool*(arg: ZValArray, n: bool): int {.discardable,importc:"add_next_index_bool".}
 proc add_next_index_null*(arg: ZValArray): int {.importc:"add_next_index_null".}
-#proc add_next_index_str*(arg: ZValArray, str: ZendString): int {.importc:"add_next_index_str".}
-proc add_next_index_string*(arg: ZValArray, str: cstring): int {.importc:"add_next_index_string".}
-proc add_next_index_stringl*(arg: ZValArray, str: cstring, len: int): int {.importc:"add_next_index_stringl".}
-proc add_next_index_zval*(arg: ZValArray, str: ZVal): int {.importc:"add_next_index_zval".}
+proc add_next_index_string*(arg: ZValArray, str: cstring): int {.discardable,importc:"add_next_index_string".}
+proc add_next_index_stringl*(arg: ZValArray, str: cstring, len: int): int {.discardable,importc:"add_next_index_stringl".}
+proc add_next_index_zval*(arg: ZValArray, str: ZVal): int {.discardable,importc:"add_next_index_zval".}
 
 when defined(php70):
   proc zend_array_count*(arg: ZendArray): uint32 {.importc:"zend_array_count".}
@@ -421,8 +424,11 @@ proc add*(arr: ZValArray, val: int64) =
 proc addNull*(arr: ZValArray, dummy: NULLType) =
   discard arr.add_next_index_null()
 
-proc add*(arr: ZValArray, val: float) =
+proc add*(arr: ZValArray, val: float64) =
   discard arr.add_next_index_double(val)
+
+proc add*(arr: ZValArray, val: bool) =
+  discard arr.add_next_index_bool(val)
 
 proc add*(arr: ZValArray, val: string) =
   discard arr.add_next_index_string(val)
@@ -433,6 +439,12 @@ proc add*(arr: ZValArray, val: ZVal) =
 proc `[]=`*(arr: ZValArray, idx: uint32, val: int64) =
   discard arr.add_index_long(idx, val)
 
+proc `[]=`*(arr: ZValArray, idx: uint32, val: float64) =
+  discard arr.add_index_double(idx, val)
+
+proc `[]=`*(arr: ZValArray, idx: uint32, val: bool) =
+  discard arr.add_index_bool(idx, val)
+
 proc `[]=`*(arr: ZValArray, idx: uint32, dummy: NULLType) =
   discard arr.add_index_null(idx)
 
@@ -441,6 +453,42 @@ proc `[]=`*(arr: ZValArray, idx: uint32, val: string) =
 
 proc `[]=`*(arr: ZValArray, idx: uint32, val: ZVal) =
   discard arr.add_index_zval(idx, val)
+
+proc `[]=`*(arr: ZValArray, key: string, len: int, val: int64) =
+  discard arr.add_assoc_long(key, len, val)
+
+proc `[]=`*(arr: ZValArray, key: string, val: int64) =
+  `[]=`(arr, key, key.len, val)
+
+proc `[]=`*(arr: ZValArray, key: string, len: int, val: float64) =
+  discard arr.add_assoc_double(key, len, val)
+
+proc `[]=`*(arr: ZValArray, key: string, val: float64) =
+  `[]=`(arr, key, key.len, val)
+
+proc `[]=`*(arr: ZValArray, key: string, len: int, val: bool) =
+  discard arr.add_assoc_bool(key, len, val)
+
+proc `[]=`*(arr: ZValArray, key: string, val: bool) =
+  `[]=`(arr, key, key.len, val)
+
+proc `[]=`*(arr: ZValArray, key: string, len: int, dummy: NULLType) =
+  discard arr.add_assoc_null(key, len)
+
+proc `[]=`*(arr: ZValArray, key: string, dummy: NULLType) =
+  `[]=`(arr, key, key.len, dummy)
+
+proc `[]=`*(arr: ZValArray, key: string, len: int, val: string) =
+  discard arr.add_assoc_string(key, len, val)
+
+proc `[]=`*(arr: ZValArray, key: string, val: string) =
+  `[]=`(arr, key, key.len, val)
+
+proc `[]=`*(arr: ZValArray, key: string, len: int, val: ZVal) =
+  discard arr.add_assoc_zval(key, len, val)
+
+proc `[]=`*(arr: ZValArray, key: string, val: ZVal) =
+  `[]=`(arr, key, key.len, val)
 
 # The macro magic for module creation
 

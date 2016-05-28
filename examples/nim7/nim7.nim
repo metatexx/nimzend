@@ -52,4 +52,11 @@ proc nim_arr(zva: ZValArray): ZValArray {.phpfunc.} =
 
   v.add zs3
 
+  var zs4 = zvalArray()
+  zs4["name"] = "Nim"
+  zs4["age"] = 3500
+  zs4["salary"] = 1.75
+
+  v.add zs4
+
 finishExtension("nim7","0.1")
