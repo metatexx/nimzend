@@ -1,6 +1,6 @@
 # nim build --verbosity:0
-# !run nim tests
-# run phpr dl("nimext.so"); echo nim_peg("Var1=key1;var2=Key2;   VAR3").PHP_EOL;
+# run nim tests
+# !run phpr dl("nimext.so"); echo nim_peg("Var1=key1;var2=Key2;   VAR3").PHP_EOL;
 # !run phpr dl("nimext.so"); echo nim_zval("12\0"."3").PHP_EOL;
 # !run phpr dl("nimext.so"); echo nim_alpha("12H!e#0&ll3_o?").PHP_EOL;
 # !run phpr dl("nimext.so"); echo nim_fun(2.5, "Hello World!", " - ").PHP_EOL;
@@ -39,9 +39,8 @@ proc nim_alpha(str: string): string {.phpfunc.} =
           result.add ch
 
 proc nim_zval(zv: ZVal) {.phpfunc.} =
-  echo zv.kind
-  echo zv.value.str.text
-  echo zv.value.str.len
+  echo zv.zend_zval_type_name
+  #echo zv[].repr
 
 proc nim_peg(str: string): string {.phpfunc.} =
   proc handleMatches(m: int, n: int, c: openArray[string]): string =
