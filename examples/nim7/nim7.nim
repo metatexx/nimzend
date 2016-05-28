@@ -46,15 +46,10 @@ proc nim_arr(zva: ZValArray): ZValArray {.phpfunc.} =
   #discard add_index_zval(v, 6, zva)
 
   var zs3 = zvalArray()
-  discard zs3.array_init(0)
-  discard zs3.add_next_index_long(1)
-  discard zs3.add_next_index_long(2)
-  discard zs3.add_next_index_long(3)
-
-  v.add zs3
-
   zs3.add 100
   zs3.add "101x"
   zs3.add 102.1
+
+  v.add zs3
 
 finishExtension("nim7","0.1")

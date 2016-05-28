@@ -381,8 +381,9 @@ else:
     z.value.dval = v
     z.kind = IS_DOUBLE
 
-template zvalArray*(): ZValArray =
-  createZVal().ZValArray
+proc zvalArray*(size: uint32 = 0): ZValArray =
+  result = createZVal().ZValArray
+  discard result.array_init(size)
 
 proc zvalLong*(val: int): ZVal =
   result = createZVal()
