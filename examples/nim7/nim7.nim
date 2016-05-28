@@ -15,11 +15,10 @@ proc nim_add(a: int, b: int): int {.phpfunc.} =
 proc nim_say(s: string): string {.phpfunc.} =
   result = "Hello " & s & "!"
 
-proc nim_arr(s: ZValArray) {.phpfunc.} =
-  let v = returnValue.ZValArray
-  discard array_init(v,0)
+proc nim_arr(zva: ZValArray): ZValArray {.phpfunc.} =
+  let v = result
 
-  echo s[].repr
+  echo "Array Elements: ", zva.len
 
   let key0 = "key0"
   discard add_assoc_null(v, key0, key0.len)
@@ -35,24 +34,27 @@ proc nim_arr(s: ZValArray) {.phpfunc.} =
   discard add_index_string(v, 2, "Foo!")
   discard add_index_stringl(v, 3, "Barbapapa", 3)
 
-  var zv1 = createZVal()
-  zv1.zvalLong(1234)
-  discard add_index_zval(v, 4, zv1)
+  var zv1 = zvalLong(1234567890)
+  v[4] = zv1
+  v[5] = zvalString("Test ZVal")
+  v[6] = 9876543210
+  # skipping 7
+  v[8] = "String direct"
+  v[9] = NULL # niltest
 
-  var zv2 = createZVal()
-  zvalZendString(zv2, "Test ZVal")
-  discard add_index_zval(v, 5, zv2)
+  # using zva here only works in php 7 .. why?
+  #discard add_index_zval(v, 6, zva)
 
-  # using s here only works in php 7 .. why?
-  #discard add_index_zval(v, 6, s)
-
-  var zs3 = createZVal().ZValArray
+  var zs3 = zvalArray()
   discard zs3.array_init(0)
   discard zs3.add_next_index_long(1)
   discard zs3.add_next_index_long(2)
   discard zs3.add_next_index_long(3)
-  discard add_next_index_zval(v, zs3.ZVal)
 
-  #returnArray()
+  v.add zs3
+
+  zs3.add 100
+  zs3.add "101x"
+  zs3.add 102.1
 
 finishExtension("nim7","0.1")

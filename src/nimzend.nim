@@ -178,6 +178,30 @@ else:
       long: int64
       dval: float64
       str: tuple[text: cstring, len: int64]
+      arr: ZendArray
+
+    ZendBucketObj* = object
+      val: ZValObj
+      h:  uint64            # hash value (or numeric index)
+      key: ZendString       # string key or NULL for numerics
+
+    ZendBucket* = ptr ZendBucketObj
+
+    ZendArrayObj* = object
+      nTableSize: uint32
+      nTableMask: uint32
+      nNumOfElements: uint32
+      nNextFreeElement: int64
+      pInternalPointer: ZendBucket # used for element traversal
+      pListHead: ZendBucket
+      pListTail: ZendBucket
+      arBuckets: ptr ZendBucket
+      pDestructor: pointer  # dtor_func_t
+      persistend: bool # unsure about sizeof's from here
+      nApplyCount: uint8
+      bApplyProtection: bool
+
+    ZendArray* = ptr ZendArrayObj
 
     ZValObj* = object
       value: ZendValue
@@ -186,8 +210,15 @@ else:
       isRefGc: uint8
 
     ZVal* = ptr ZValObj
+
     #ZendExecuteDataObj* = object
     #ZendExecuteData* = ptr ZendExecuteDataObj
+
+# pseudo types for parameters
+
+type
+  ZValArray* = distinct ZVal
+  ZValArrayS* = ZValArray
 
 type
   ZendModuleEntry* = object # not {.packed.} !
@@ -223,12 +254,6 @@ type
     num_args: uint32
     flags: uint32
 
-# pseudo types for parameters
-
-type
-  ZValArray* = distinct ZVal
-  ZValArrayS* = ZVal
-
 # zend functions
 
 proc zend_zval_type_name*(arg: ZVal): cstring {.stdcall,importc.}
@@ -260,11 +285,21 @@ proc add_index_stringl*(arg: ZValArray, idx: uint64, str: cstring, len: int): in
 proc add_index_zval*(arg: ZValArray, idx: uint64, str: ZVal): int {.importc:"add_index_zval".}
 
 proc add_next_index_long*(arg: ZValArray, n: int64): int {.importc:"add_next_index_long".}
+proc add_next_index_double*(arg: ZValArray, n: float64): int {.importc:"add_next_index_double".}
 proc add_next_index_null*(arg: ZValArray): int {.importc:"add_next_index_null".}
 #proc add_next_index_str*(arg: ZValArray, str: ZendString): int {.importc:"add_next_index_str".}
 proc add_next_index_string*(arg: ZValArray, str: cstring): int {.importc:"add_next_index_string".}
 proc add_next_index_stringl*(arg: ZValArray, str: cstring, len: int): int {.importc:"add_next_index_stringl".}
 proc add_next_index_zval*(arg: ZValArray, str: ZVal): int {.importc:"add_next_index_zval".}
+
+when defined(php70):
+  proc zend_array_count*(arg: ZendArray): uint32 {.importc:"zend_array_count".}
+  template zend_hash_num_elements*(arg: ZendArray): uint32 = (arg).nNumOfElements
+else:
+  proc zend_hash_num_elements*(arg: ZendArray): uint32 {.importc:"zend_hash_num_elements".}
+  template zend_array_count*(arg: ZendArray): uint32 = zend_hash_num_elements(arg)
+
+proc len*(zv: ZValArray): int = zend_array_count(zv.ZVal.value.arr).int
 
 template pemalloc*(size: int, persistent: bool): pointer =
   if persistent: zend_malloc(size) else: emalloc(size)
@@ -300,7 +335,7 @@ when defined(php700):
       result.gc.u.type_info = IS_TYPE_REFCOUNTED.uint32 + IS_TYPE_COPYABLE.uint32
 
   # Our Functions
-  proc zvalZendString*(v: ZVal, s: string, n: int = 0, persistent: bool = false) {.inline.} =
+  proc zvalString*(v: ZVal, s: string, n: int = 0, persistent: bool = false) {.inline.} =
     v.value.str = zendStringInit(s, persistent)
     v.u1.v.kind = IS_STRING
     v.u1.v.kind_flags = v.value.str.gc.u.v.flags
@@ -333,7 +368,7 @@ else:
   template notDiscarded*(): bool =
     (retval_used == 1)
 
-  proc zvalZendString*(v: ZVal, s: string, persistent: bool = false) {.inline.} =
+  proc zvalString*(v: ZVal, s: string, persistent: bool = false) {.inline.} =
     v.value.str.text = estrdup(s)
     v.value.str.len = s.len
     v.kind = IS_STRING
@@ -346,8 +381,23 @@ else:
     z.value.dval = v
     z.kind = IS_DOUBLE
 
+template zvalArray*(): ZValArray =
+  createZVal().ZValArray
+
+proc zvalLong*(val: int): ZVal =
+  result = createZVal()
+  result.zvalLong(val)
+
+proc zvalFloat*(val: float): ZVal =
+  result = createZVal()
+  result.zvalFloat(val)
+
+proc zvalString*(val: string): ZVal =
+  result = createZVal()
+  result.zvalString(val)
+
 template returnString*(s) =
-  zvalZendString(returnValue, s)
+  zvalString(returnValue, s)
   return
 
 template returnLong*(s) =
@@ -357,6 +407,41 @@ template returnLong*(s) =
 template returnFloat*(s) =
   zvalFloat(returnValue, s)
   return
+
+converter zvalFromZValArray*(val: ZValArray): ZVal = val.ZVal
+
+type NULLType* = distinct pointer
+const NULL* = nil.NULLType
+
+proc add*(arr: ZValArray, val: int64) =
+  discard arr.add_next_index_long(val)
+
+# xxx how to allow add nil (and just that)?
+proc addNull*(arr: ZValArray, dummy: NULLType) =
+  discard arr.add_next_index_null()
+
+proc add*(arr: ZValArray, val: float) =
+  discard arr.add_next_index_double(val)
+
+proc add*(arr: ZValArray, val: string) =
+  discard arr.add_next_index_string(val)
+
+proc add*(arr: ZValArray, val: ZVal) =
+  discard arr.add_next_index_zval(val)
+
+proc `[]=`*(arr: ZValArray, idx: uint32, val: int64) =
+  discard arr.add_index_long(idx, val)
+
+proc `[]=`*(arr: ZValArray, idx: uint32, dummy: NULLType) =
+  discard arr.add_index_null(idx)
+
+proc `[]=`*(arr: ZValArray, idx: uint32, val: string) =
+  discard arr.add_index_string(idx, val)
+
+proc `[]=`*(arr: ZValArray, idx: uint32, val: ZVal) =
+  discard arr.add_index_zval(idx, val)
+
+# The macro magic for module creation
 
 proc newParam(name: string, kind: string): NimNode {.compiletime.} =
   result = newNimNode(nnkIdentDefs)
@@ -400,6 +485,19 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
 
   var body = newNimNode(nnkStmtList)
 
+  if autoResult.kind == nnkIdent:
+    case $autoResult.ident:
+      of "ZValArray":
+        body.add parseStmt("var result = returnValue.ZValArray")
+        body.add parseStmt("discard result.array_init")
+        autoResult = newEmptyNode()
+        prc[3][0] = autoResult
+      of "ZVal":
+        body.add parseStmt("var result = returnValue")
+        autoResult = newEmptyNode()
+        prc[3][0] = autoResult
+      else: discard
+
   if prc[3].len > 1:
     # we simulate real parameters (optional)
     var fmt = ""
@@ -429,7 +527,7 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
           args.add ", " & vname & ".addr"
 
         of "ZValArrayS":
-          var tmp = "var " & vname & ": ZVal"
+          var tmp = "var " & vname & ": ZValArray"
           if default != nnkEmpty:
             error("Default parameters for Array not implemented")
           body.add parseStmt tmp
@@ -438,7 +536,7 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
           args.add ", " & vname & ".addr"
 
         of "ZValArray":
-          var tmp = "var " & vname & ": ZVal"
+          var tmp = "var " & vname & ": ZValArray"
           if default != nnkEmpty:
             error("Default parameters for Array not implemented")
           body.add parseStmt tmp
@@ -523,6 +621,9 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
       of "string": body.add parseStmt("returnString result")
       of "float": body.add parseStmt("returnFloat result")
       of "bool": body.add parseStmt("returnFloat bool")
+      # more specialized
+      of "ZValArray": discard # done
+      of "ZVal": discard # done
       else: error "Automatic result type '" & $autoResult.ident & "' not supported"
 
   prc[6] = body
