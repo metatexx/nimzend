@@ -4,7 +4,7 @@
 
 import "../../src/nimzend.nim"
 
-proc nimgreeter(s: string) {.phpfunc.} =
-  returnString "Hello " & s & "!"
+proc nimgreeter(s: string): string {.phpfunc.} =
+  result = "Hello " & s & "!"
 
 finishExtension("nimgreets", "0.1")

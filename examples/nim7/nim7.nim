@@ -1,5 +1,5 @@
-# nim build -d:php70 -d:phpinfo --verbosity:1 --hints:off
-# run nim tests -d:php70
+# nim build -d:php54 -d:phpinfo --verbosity:1 --hints:off
+# run nim tests -d:php54
 # !run php7r dl("nim7.so"); echo ">".nim_say("World")."<".PHP_EOL;
 # !run php7r dl("nim7.so"); echo ">".nim_add(123, 111)."<".PHP_EOL;
 
@@ -18,21 +18,21 @@ proc nim_say(s: string): string {.phpfunc.} =
 proc nim_arr(zva: ZValArray): ZValArray {.phpfunc.} =
   let v = result
 
-  echo "Array Elements: ", zva.len
+  phpPrintf("The %s has %d elements!\n", zva.zvalType, zva.len)
 
   let key0 = "key0"
-  discard add_assoc_null(v, key0, key0.len)
+  add_assoc_null(v, key0, key0.klen) # php 5 / php 7 use different lens!
   let key1 = "key1"
-  discard add_assoc_long(v, key1, key1.len, 12345)
+  add_assoc_long(v, key1, key1.klen, 12345)
   let key2 = "key2"
-  discard add_assoc_string(v, key2, key2.len, "Cool!")
+  add_assoc_string(v, key2, key2.klen, "Cool!")
   let key3 = "key3"
-  discard add_assoc_stringl(v, key3, key3.len, "Cool!", 2)
+  add_assoc_stringl(v, key3, key3.klen, "Cool!", 2)
 
-  discard add_index_null(v, 0)
-  discard add_index_long(v, 1, 4711)
-  discard add_index_string(v, 2, "Foo!")
-  discard add_index_stringl(v, 3, "Barbapapa", 3)
+  add_index_null(v, 0)
+  add_index_long(v, 1, 4711)
+  add_index_string(v, 2, "Foo!")
+  add_index_stringl(v, 3, "Barbapapa", 3)
 
   var zv1 = zvalLong(1234567890)
   v[4] = zv1

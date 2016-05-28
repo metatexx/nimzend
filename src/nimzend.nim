@@ -256,11 +256,13 @@ type
 
 # zend functions
 
-proc zend_zval_type_name*(arg: ZVal): cstring {.stdcall,importc.}
 proc zend_parse_parameters*(num: int, format: cstring): int {.importc: "zend_parse_parameters", varargs.}
 
 proc zend_malloc*(size: int): pointer {.importc:"malloc".}
 proc zend_free*(size: int): pointer {.importc:"free".}
+
+proc php_printf*(format: cstring) {.importc:"php_printf", varargs.}
+proc zvalType*(arg: ZVal): cstring {.stdcall,importc:"zend_zval_type_name".}
 
 proc emalloc*(size: int): pointer {.importc:"_emalloc".}
 proc efree*(mem: pointer) {.importc:"_efree".}
@@ -277,7 +279,7 @@ proc add_assoc_bool*(arg: ZValArray, key: cstring, key_len: int, n: bool): int {
 proc add_assoc_null*(arg: ZValArray, key: cstring, key_len: int): int {.discardable,importc:"add_assoc_null_ex".}
 proc add_assoc_string*(arg: ZValArray, key: cstring, key_len: int, str: cstring): int {.discardable,importc:"add_assoc_string_ex".}
 proc add_assoc_stringl*(arg: ZValArray, key: cstring, key_len: int, str: cstring, len: int): int {.discardable,importc:"add_assoc_stringl_ex".}
-proc add_assoc_zval*(arg: ZValArray, key: cstring, key_len: int, val: ZVal): int {.discardable,importc:"add_assoc_stringl_ex".}
+proc add_assoc_zval*(arg: ZValArray, key: cstring, key_len: int, val: ZVal): int {.discardable,importc:"add_assoc_zval_ex".}
 
 proc add_index_long*(arg: ZValArray, idx: uint64, n: int64): int {.discardable,importc:"add_index_long".}
 proc add_index_bool*(arg: ZValArray, idx: uint64, n: bool): int {.discardable,importc:"add_index_bool".}
@@ -298,9 +300,12 @@ proc add_next_index_zval*(arg: ZValArray, str: ZVal): int {.discardable,importc:
 when defined(php70):
   proc zend_array_count*(arg: ZendArray): uint32 {.importc:"zend_array_count".}
   template zend_hash_num_elements*(arg: ZendArray): uint32 = (arg).nNumOfElements
+  template klen*(k: string): int = k.len
 else:
   proc zend_hash_num_elements*(arg: ZendArray): uint32 {.importc:"zend_hash_num_elements".}
   template zend_array_count*(arg: ZendArray): uint32 = zend_hash_num_elements(arg)
+  # PHP 5.x needs key.len + 1 for the assoc functions
+  template klen*(k: string): int = k.len + 1
 
 proc len*(zv: ZValArray): int = zend_array_count(zv.ZVal.value.arr).int
 
@@ -458,37 +463,37 @@ proc `[]=`*(arr: ZValArray, key: string, len: int, val: int64) =
   discard arr.add_assoc_long(key, len, val)
 
 proc `[]=`*(arr: ZValArray, key: string, val: int64) =
-  `[]=`(arr, key, key.len, val)
+  `[]=`(arr, key, key.klen, val)
 
 proc `[]=`*(arr: ZValArray, key: string, len: int, val: float64) =
   discard arr.add_assoc_double(key, len, val)
 
 proc `[]=`*(arr: ZValArray, key: string, val: float64) =
-  `[]=`(arr, key, key.len, val)
+  `[]=`(arr, key, key.klen, val)
 
 proc `[]=`*(arr: ZValArray, key: string, len: int, val: bool) =
   discard arr.add_assoc_bool(key, len, val)
 
 proc `[]=`*(arr: ZValArray, key: string, val: bool) =
-  `[]=`(arr, key, key.len, val)
+  `[]=`(arr, key, key.klen, val)
 
 proc `[]=`*(arr: ZValArray, key: string, len: int, dummy: NULLType) =
   discard arr.add_assoc_null(key, len)
 
 proc `[]=`*(arr: ZValArray, key: string, dummy: NULLType) =
-  `[]=`(arr, key, key.len, dummy)
+  `[]=`(arr, key, key.klen, dummy)
 
 proc `[]=`*(arr: ZValArray, key: string, len: int, val: string) =
   discard arr.add_assoc_string(key, len, val)
 
 proc `[]=`*(arr: ZValArray, key: string, val: string) =
-  `[]=`(arr, key, key.len, val)
+  `[]=`(arr, key, key.klen, val)
 
 proc `[]=`*(arr: ZValArray, key: string, len: int, val: ZVal) =
   discard arr.add_assoc_zval(key, len, val)
 
 proc `[]=`*(arr: ZValArray, key: string, val: ZVal) =
-  `[]=`(arr, key, key.len, val)
+  `[]=`(arr, key, key.klen, val)
 
 # The macro magic for module creation
 
