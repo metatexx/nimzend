@@ -15,10 +15,9 @@ elif defined(php700):
 elif defined(nimcheck):
   const ZEND_MODULE_API_NO = 99999999
 else:
-  {.error:"You need to define the PHP version (php54 php53)".}
+  {.error:"You need to define the PHP version (php53 php54 php55 php56 php70).".}
 
 when defined(php700):
-  #{.error: "PHP 7 not yet supported".}
   type
     ZendTypes* {.size: sizeof(uint8).} = enum
       IS_UNDEF
@@ -674,10 +673,7 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
       of "int": body.add parseStmt("returnLong result")
       of "string": body.add parseStmt("returnString result")
       of "float": body.add parseStmt("returnFloat result")
-      of "bool": body.add parseStmt("returnFloat bool")
-      # more specialized
-      of "ZValArray": discard # done
-      of "ZVal": discard # done
+      of "bool": body.add parseStmt("returnBool result")
       else: error "Automatic result type '" & $autoResult.ident & "' not supported"
 
   prc[6] = body
