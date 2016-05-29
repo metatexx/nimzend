@@ -56,7 +56,7 @@ when defined(php700):
       len: int64
       val: array[0..0, char]
 
-    ZendString = ptr ZendStringObj
+    ZendString* = ptr ZendStringObj
 
     ZendBucketObj* = object
       val: ZValObj
@@ -152,6 +152,9 @@ when defined(php700):
 
     ZendExecuteData* = ptr ZendExecuteDataObj
 
+    ZendPosition* = uint32
+    #ZendPositionObj* = uint64 #uint32
+
 else:
   type
     ZendTypes* {.size: sizeof(uint8).} = enum
@@ -179,13 +182,19 @@ else:
       str: tuple[text: cstring, len: int64]
       arr: ZendArray
 
-    ZendBucketObj* = object
-      val: ZValObj
-      h:  uint64            # hash value (or numeric index)
-      key: ZendString       # string key or NULL for numerics
-
     ZendBucket* = ptr ZendBucketObj
+    ZendBucketObj* = object
+      h: uint64
+      nKeyLength: uint32
+      pData: pointer
+      pDataPtr: pointer
+      pListNext: ZendBucket
+      pListLast: ZendBucket
+      pNext: ZendBucket
+      pLast: ZendBucket
+      arKey: cstring
 
+    ZendArray* = ptr ZendArrayObj
     ZendArrayObj* = object
       nTableSize: uint32
       nTableMask: uint32
@@ -200,15 +209,15 @@ else:
       nApplyCount: uint8
       bApplyProtection: bool
 
-    ZendArray* = ptr ZendArrayObj
-
+    ZVal* = ptr ZValObj
     ZValObj* = object
       value: ZendValue
       refcountGC: uint32
       kind: ZendTypes
       isRefGc: uint8
 
-    ZVal* = ptr ZValObj
+    ZendPosition* = ptr ZendBucketObj
+    ZendPositionObj* = ZendBucketObj
 
     #ZendExecuteDataObj* = object
     #ZendExecuteData* = ptr ZendExecuteDataObj
@@ -298,15 +307,36 @@ proc add_next_index_string*(arg: ZValArray, str: cstring): int {.discardable,imp
 proc add_next_index_stringl*(arg: ZValArray, str: cstring, len: int): int {.discardable,importc:"add_next_index_stringl".}
 proc add_next_index_zval*(arg: ZValArray, str: ZVal): int {.discardable,importc:"add_next_index_zval".}
 
-when defined(php70):
+proc zend_hash_internal_pointer_reset_ex*(arg: ZendArray,
+  pos: ptr ZendPosition): int {.discardable,importc:"zend_hash_internal_pointer_reset_ex".}
+
+proc zend_hash_move_forward_ex*(arg: ZendArray,
+  pos: ptr ZendPosition): int {.discardable,importc:"zend_hash_move_forward_ex".}
+
+when defined(php700):
+  template klen*(k: string): int = k.len
+
   proc zend_array_count*(arg: ZendArray): uint32 {.importc:"zend_array_count".}
   template zend_hash_num_elements*(arg: ZendArray): uint32 = (arg).nNumOfElements
-  template klen*(k: string): int = k.len
+
+  proc zend_hash_get_current_data_ex*(arg: ZendArray, pos: ptr ZendPosition):
+    ZVal {.discardable,importc:"zend_hash_get_current_data_ex".}
+
+  proc zend_hash_get_current_key_ex*(arg: ZendArray, str_index: ptr ZendString, num_index: ptr uint64, pos: ptr ZendPosition):
+    int {.discardable,importc:"zend_hash_get_current_key_ex".}
+
 else:
-  proc zend_hash_num_elements*(arg: ZendArray): uint32 {.importc:"zend_hash_num_elements".}
-  template zend_array_count*(arg: ZendArray): uint32 = zend_hash_num_elements(arg)
   # PHP 5.x needs key.len + 1 for the assoc functions
   template klen*(k: string): int = k.len + 1
+
+  proc zend_hash_num_elements*(arg: ZendArray): uint32 {.importc:"zend_hash_num_elements".}
+  template zend_array_count*(arg: ZendArray): uint32 = zend_hash_num_elements(arg)
+
+  proc zend_hash_get_current_data_ex*(arg: ZendArray, data: ptr ptr ZVal,
+    pos: ptr ZendPosition): int {.discardable,importc:"zend_hash_get_current_data_ex".}
+
+  proc zend_hash_get_current_key_ex*(arg: ZendArray, key: ptr cstring, klen: ptr uint32, index: ptr uint64,
+    duplicate: bool, pos: ptr ZendPosition): int {.discardable,importc:"zend_hash_get_current_key_ex".}
 
 proc len*(zv: ZValArray): int = zend_array_count(zv.ZVal.value.arr).int
 
@@ -344,6 +374,8 @@ when defined(php700):
       result.gc.u.type_info = IS_TYPE_REFCOUNTED.uint32 + IS_TYPE_COPYABLE.uint32
 
   # Our Functions
+
+  # Create a ZVal
   proc zvalString*(v: ZVal, s: string, n: int = 0, persistent: bool = false) {.inline.} =
     v.value.str = zendStringInit(s, persistent)
     v.u1.v.kind = IS_STRING
@@ -356,6 +388,7 @@ when defined(php700):
   proc zvalFloat*(z: ZVal, v: float64) {.inline.} =
     z.value.dval = v
     z.u1.v.kind = IS_DOUBLE
+
 
   #proc allocZendArray(v: ZVal) =
     #v.value.arr = cast[ZendArray](emalloc(sizeof(ZendArrayObj)))
@@ -419,6 +452,9 @@ template returnFloat*(s) =
   return
 
 converter zvalFromZValArray*(val: ZValArray): ZVal = val.ZVal
+
+# get the ZendArray (HashTable) from the ZVal(Array)
+template zendArray*(v: ZValArray): ZendArray = zva.ZVal.value.arr
 
 type NULLType* = distinct pointer
 const NULL* = nil.NULLType
