@@ -39,7 +39,7 @@ task build, "builds the extension":
   switch("app", "lib")
   switch("d", "nimphpext")
   switch("threads","on")
-  switch("d","release")
+  #switch("d","release") # should be only set by user!
   switch("d","noSignalHandler")
   switch("gc", "stack") # using the gc:stack of Nim
 

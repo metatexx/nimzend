@@ -260,6 +260,8 @@ proc zend_parse_parameters*(num: int, format: cstring): int {.importc: "zend_par
 proc zend_malloc*(size: int): pointer {.importc:"malloc".}
 proc zend_free*(size: int): pointer {.importc:"free".}
 
+proc zend_error*(kind: int, format: cstring) {.importc:"zend_error", varargs.}
+
 proc php_printf*(format: cstring) {.importc:"php_printf", varargs.}
 proc zvalType*(arg: ZVal): cstring {.stdcall,importc:"zend_zval_type_name".}
 
@@ -543,12 +545,12 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
       of "ZValArray":
         body.add parseStmt("var result = returnValue.ZValArray")
         body.add parseStmt("discard result.array_init")
-        autoResult = newEmptyNode()
-        prc[3][0] = autoResult
+        #autoResult = newEmptyNode()
+        #prc[3][0] = autoResult
       of "ZVal":
         body.add parseStmt("var result = returnValue")
-        autoResult = newEmptyNode()
-        prc[3][0] = autoResult
+        #autoResult = newEmptyNode()
+        #prc[3][0] = autoResult
       else: discard
 
   if prc[3].len > 1:
@@ -674,6 +676,16 @@ proc zifProc(prc: NimNode): NimNode {.compileTime.} =
       of "string": body.add parseStmt("returnString result")
       of "float": body.add parseStmt("returnFloat result")
       of "bool": body.add parseStmt("returnBool result")
+      of "ZValArray":
+        # if returnValue[] is != result we need to copy the zval into returnValue
+        when not defined(release):
+          body.add parseStmt("if returnValue != result: zend_error(1,\"NimZend: Wrong usage of zvalArray result!\")")
+        prc[3][0] = newEmptyNode()
+      of "ZVal":
+        # if returnValue[] is != result we need to copy the zval into returnValue
+        when not defined(release):
+          body.add parseStmt("if returnValue != result: zend_error(1,\"NimZend: Wrong usage of zval result!\")")
+        prc[3][0] = newEmptyNode()
       else: error "Automatic result type '" & $autoResult.ident & "' not supported"
 
   prc[6] = body
