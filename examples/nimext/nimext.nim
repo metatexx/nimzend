@@ -39,7 +39,7 @@ proc nim_alpha(str: string): string {.phpfunc.} =
           result.add ch
 
 proc nim_zval(zv: ZVal) {.phpfunc.} =
-  echo zv.zend_zval_type_name
+  echo zv.zvalType
   #echo zv[].repr
 
 proc nim_peg(str: string): string {.phpfunc.} =
