@@ -1,6 +1,6 @@
 # Minimal Zend Module
 
-import macros
+import macros, strutils
 
 when defined(php503):
   const ZEND_MODULE_API_NO = 20090626
@@ -357,6 +357,9 @@ when defined(php700):
   template notDiscarded*(): bool =
     true # for now
 
+  template zvalKind*(z: ZVal): auto = z.u1.v.kind
+  #template zvalKind*(z: ZVal, k: auto) = z.u1.v.kind = k
+
   template zendStringInit(s: string, persistent: bool = false): ZendString =
     zendStringInit(s, s.len, persistent)
 
@@ -373,9 +376,7 @@ when defined(php700):
     else:
       result.gc.u.type_info = IS_TYPE_REFCOUNTED.uint32 + IS_TYPE_COPYABLE.uint32
 
-  # Our Functions
-
-  # Create a ZVal
+  # Fill a ZVal will Data (has ZVal as first argument)
   proc zvalString*(v: ZVal, s: string, n: int = 0, persistent: bool = false) {.inline.} =
     v.value.str = zendStringInit(s, persistent)
     v.u1.v.kind = IS_STRING
@@ -389,6 +390,10 @@ when defined(php700):
     z.value.dval = v
     z.u1.v.kind = IS_DOUBLE
 
+  proc zvalString*(v: ZVal): cstring {.inline.} = v.value.str.val
+  proc zvalLong*(z: ZVal): int64 = z.value.lval
+  #proc zvalBool*(z: ZVal): int64 = z.value.
+  proc zvalFloat*(z: ZVal): float64 = z.value.dval
 
   #proc allocZendArray(v: ZVal) =
     #v.value.arr = cast[ZendArray](emalloc(sizeof(ZendArrayObj)))
@@ -410,6 +415,8 @@ else:
   template notDiscarded*(): bool =
     (retval_used == 1)
 
+  template zvalKind*(z: ZVal): auto = z.kind
+
   proc zvalString*(v: ZVal, s: string, persistent: bool = false) {.inline.} =
     v.value.str.text = estrdup(s)
     v.value.str.len = s.len
@@ -423,6 +430,12 @@ else:
     z.value.dval = v
     z.kind = IS_DOUBLE
 
+  proc zvalString*(v: ZVal): cstring {.inline.} = v.value.str.text
+  proc zvalLong*(z: ZVal): int64 = z.value.long
+  #proc zvalBool*(z: ZVal): int64 = z.value.
+  proc zvalFloat*(z: ZVal): float64 = z.value.dval
+
+# Create a new ZVal from some other type
 proc zvalArray*(size: uint32 = 0): ZValArray =
   result = createZVal().ZValArray
   discard result.array_init(size)
@@ -439,6 +452,7 @@ proc zvalString*(val: string): ZVal =
   result = createZVal()
   result.zvalString(val)
 
+# Fill the hidden Zend return parameter with a result
 template returnString*(s) =
   zvalString(returnValue, s)
   return
@@ -451,6 +465,11 @@ template returnFloat*(s) =
   zvalFloat(returnValue, s)
   return
 
+template returnBool*(s) =
+  zvalBool(returnValue, s)
+  return
+
+# we can transform the pseudo type ZValArray always to a ZVal
 converter zvalFromZValArray*(val: ZValArray): ZVal = val.ZVal
 
 # get the ZendArray (HashTable) from the ZVal(Array)
@@ -459,11 +478,12 @@ template zendArray*(v: ZValArray): ZendArray = zva.ZVal.value.arr
 type NULLType* = distinct pointer
 const NULL* = nil.NULLType
 
+
+# Add data to an array at the end
 proc add*(arr: ZValArray, val: int64) =
   discard arr.add_next_index_long(val)
 
-# xxx how to allow add nil (and just that)?
-proc addNull*(arr: ZValArray, dummy: NULLType) =
+proc add*(arr: ZValArray, dummy: NULLType) =
   discard arr.add_next_index_null()
 
 proc add*(arr: ZValArray, val: float64) =
@@ -478,6 +498,7 @@ proc add*(arr: ZValArray, val: string) =
 proc add*(arr: ZValArray, val: ZVal) =
   discard arr.add_next_index_zval(val)
 
+# Insert data to an array by numeric index
 proc `[]=`*(arr: ZValArray, idx: uint32, val: int64) =
   discard arr.add_index_long(idx, val)
 
@@ -496,6 +517,7 @@ proc `[]=`*(arr: ZValArray, idx: uint32, val: string) =
 proc `[]=`*(arr: ZValArray, idx: uint32, val: ZVal) =
   discard arr.add_index_zval(idx, val)
 
+# Insert data to an array by key (string)
 proc `[]=`*(arr: ZValArray, key: string, len: int, val: int64) =
   discard arr.add_assoc_long(key, len, val)
 
@@ -531,6 +553,80 @@ proc `[]=`*(arr: ZValArray, key: string, len: int, val: ZVal) =
 
 proc `[]=`*(arr: ZValArray, key: string, val: ZVal) =
   `[]=`(arr, key, key.klen, val)
+
+# Array helpers
+
+iterator items*(zva: ZValArray): ZVal =
+  var pos: ZendPosition # 7.0 "uint32" / 5.x ptr ZendBucketObj
+  zend_hash_internal_pointer_reset_ex(zva.zendArray, pos.addr)
+  while(true):
+    when defined(php700):
+      var elm: ZVal
+      elm = zend_hash_get_current_data_ex(zva.zendArray, pos.addr);
+      if elm == nil:
+        break;
+      yield elm
+    else:
+      var elm: ptr ZVal
+      zend_hash_get_current_data_ex(zva.zendArray, elm.addr, pos.addr)
+      if elm == nil:
+        break;
+      yield elm[]
+    zend_hash_move_forward_ex(zva.zendArray, pos.addr)
+
+iterator pairs*(zva: ZValArray): tuple[k: tuple[key: cstring, idx: uint64], b: ZVal] =
+  var pos: ZendPosition
+  zend_hash_internal_pointer_reset_ex(zva.zendArray, pos.addr)
+  while(true):
+    when defined(php700):
+      var elm: ZVal
+      elm = zend_hash_get_current_data_ex(zva.zendArray, pos.addr);
+      if elm == nil:
+        break;
+
+      var key: ZendString
+      var idx: uint64
+
+      zend_hash_get_current_key_ex(zva.zendArray, key.addr, idx.addr, pos.addr)
+
+      if key != nil:
+        yield ((key.val.cstring, 0.uint64), elm)
+      else:
+        yield ((nil.cstring, idx), elm)
+
+    else:
+      var elm: ptr ZVal
+      zend_hash_get_current_data_ex(zva.zendArray, elm.addr, pos.addr)
+      if elm == nil:
+        break;
+      yield ((nil.cstring, 0.uint64), elm[])
+    zend_hash_move_forward_ex(zva.zendArray, pos.addr)
+
+proc `$`*(z: ZVal): string =
+  case z.zvalKind:
+      of IS_LONG: $ z.zvalLong
+      of IS_DOUBLE: $ z.zvalFloat
+      of IS_STRING: $ z.zvalString # a simple copy
+      else: "not supported for now"
+
+# needs more work such that it behaves like PHP
+proc parseFloat0(s: string): float64 =
+  if s == "" or s == nil: 0.float64
+  else: s.parseFloat
+
+proc toInt*(z: ZVal): int64 =
+  case z.zvalKind:
+      of IS_LONG: z.zvalLong
+      of IS_DOUBLE: z.zvalFloat.int
+      of IS_STRING: ($ z.zvalString).parseFloat0.int
+      else: 0
+
+proc toFloat*(z: ZVal): float64 =
+  case z.zvalKind:
+      of IS_LONG: z.zvalLong.float
+      of IS_DOUBLE: z.zvalFloat
+      of IS_STRING: ($ z.zvalString).parseFloat0
+      else: 0
 
 # The macro magic for module creation
 

@@ -9,14 +9,25 @@ import "../../src/nimzend.nim"
 # my code
 #
 
-when defined(release):
-  {.error: "WTF?".}
-
-proc nim_arrays(zva: ZValArray): ZValArray {.phpfunc.} =
+proc nim_arrays(zva: ZValArray) {.phpfunc.} =
   phpPrintf("The %s has %d elements!\n", zva.zvalType, zva.len)
 
-  var pos: ZendPosition # 7.0 "uint32" / 5.x ptr ZendBucketObj
+  #echo "Dump Array Values (and transform into some other types)"
+  #for zv in zva:
+  #  echo $zv, " ", zv.toInt, " ", zv.toFloat
 
+  echo "Dump Array as Key : Value pairs (numeric and string index suppored)"
+  for ki, zv in pairs(zva):
+    if ki.key != nil:
+      echo ki.key, " : ", $zv
+    else:
+      echo ki.idx, " : ", $zv
+
+    if ki.key != nil and $ ki.key == "a": # needs a system fix for cstring == string
+      echo "Psst! Wanna buy an a?"
+
+#[
+  var pos: ZendPosition # 7.0 "uint32" / 5.x ptr ZendBucketObj
   echo "Array"
   echo "("
   zend_hash_internal_pointer_reset_ex(zva.zendArray, pos.addr)
@@ -69,5 +80,6 @@ proc nim_arrays(zva: ZValArray): ZValArray {.phpfunc.} =
   result["foo"] = "bar"
 
   #result = arr # will throw runtime error
+]#
 
 finishExtension("narrays","0.1")
