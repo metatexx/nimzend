@@ -1,5 +1,5 @@
-# nim build -d:php54 -d:phpinfo --verbosity:1 --hints:off
-# run nim tests -d:php54
+# nim build -d:php56 -d:phpinfo --verbosity:1 --hints:off
+# run nim tests -d:php56
 # !run php7r dl("nim7.so"); echo ">".nim_say("World")."<".PHP_EOL;
 # !run php7r dl("nim7.so"); echo ">".nim_add(123, 111)."<".PHP_EOL;
 
@@ -24,15 +24,17 @@ proc nim_arr(zva: ZValArray): ZValArray {.phpfunc.} =
   add_assoc_null(v, key0, key0.klen) # php 5 / php 7 use different lens!
   let key1 = "key1"
   add_assoc_long(v, key1, key1.klen, 12345)
+  let s1 = "Cool!"
+  v["key2"]=s1
   let key2 = "key2"
-  add_assoc_string(v, key2, key2.klen, "Cool!")
+  add_assoc_string(v, key2, key2.klen, s1)
   let key3 = "key3"
-  add_assoc_stringl(v, key3, key3.klen, "Cool!", 2)
+  add_assoc_stringl(v, key3, key3.klen, s1, 2)
 
   add_index_null(v, 0)
   add_index_long(v, 1, 4711)
   add_index_string(v, 2, "Foo!")
-  add_index_stringl(v, 3, "Barbapapa", 3)
+  add_index_stringl(v, 3, "Foo!", 3)
 
   var zv1 = zvalLong(1234567890)
   v[4] = zv1
@@ -54,6 +56,8 @@ proc nim_arr(zva: ZValArray): ZValArray {.phpfunc.} =
 
   var zs4 = zvalArray()
   zs4["name"] = "Nim"
+  zs4["name1"] = "Cool!"
+  zs4["name2"] = "Cool!"
   zs4["age"] = 3500
   zs4["salary"] = 1.75
 

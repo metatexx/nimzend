@@ -1,7 +1,7 @@
 # this is a specialized config to force php 7.0 compilation
 # even if the globally installed version of php differs
 
-var extensionName = "nim7"
+var extensionName = "helloarray"
 
 include "../../src/cfgtpl.nims"
 
@@ -10,7 +10,7 @@ switch("p", "../../src/")
 
 task tests, "runs a simple test":
   setCommand "nop"
-  exec phpExe & " --version"
+  #exec phpExe & " --version"
   exec phpExe & " tests.php 2>&1"
 
 # following does not work (yet)

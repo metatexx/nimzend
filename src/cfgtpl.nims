@@ -1,12 +1,26 @@
 import ospaths
 import strutils
 
-when not compiles(extensionName):
-  # this hack makes syntax checking of the file working in my IDE
-  when getCommand() == "check":
-    var extensionName = "check"
-  else:
-    {.error: "you need to declare the exensionName".}
+when defined(macosx):
+  # this is only working for homebrew php installs "but..."
+  when defined(php70):
+    var phpVer="70"
+  elif defined(php54):
+    var phpVer="54"
+  elif defined(php55):
+    var phpVer="55"
+  elif defined(php56):
+    var phpVer="56"
+
+  when compiles(phpVer):
+    var phpPath = gorge("brew --prefix homebrew/php/php" & phpVer)
+    if phpPath.contains("Error"):
+      echo "Could not determine PHP ", phpVer ," location: "
+      echo phpPath
+      quit 5
+
+    var phpConfig = phpPath / "bin" / "php-config"
+    var phpExe = phpPath / "bin" / "php"
 
 when not compiles(phpConfig):
   var phpConfig* = gorge("which php-config");
@@ -20,25 +34,33 @@ when not compiles(phpExe):
     echo "No 'php' executable found!"
     quit 5
 
-var phpver = gorge(phpConfig & " --vernum")[0..2]
+var phpRev = gorge(phpConfig & " --vernum")[0..2]
 var extensionDir = gorge(phpConfig & " --extension-dir")
 
 if defined(phpinfo) and not compileOption("verbosity", "0"):
-  echo "PHP Version " & phpver
+  echo "PHP Revision " & phpRev
   echo "PHP Extension Dir " & extensionDir
   echo "PHP Executable " & phpExe
   echo "PHP Config " & phpConfig
 
-mkDir extensionDir
+proc getExtensionFile(): string =
+  when not compiles(extensionName):
+    # this hack makes syntax checking of the file working in my IDE
+    when getCommand() == "check":
+      var extensionName = "check"
+    else:
+      {.error: "you need to declare the exensionName".}
 
-var extensionFile = extensionDir / extensionName & ".so"
+  mkDir extensionDir
+
+  result = extensionDir / extensionName & ".so"
 
 task build, "builds the extension":
   setCommand "c"
 
   switch("app", "lib")
   switch("d", "nimphpext")
-  switch("threads","on")
+  #switch("threads","on")
   #switch("d","release") # should be only set by user!
   switch("d","noSignalHandler")
   switch("gc", "stack") # using the gc:stack of Nim
@@ -52,8 +74,9 @@ task build, "builds the extension":
     echo "OS not supported"
     quit 5
 
-  switch("d", "php" & phpver)
+  switch("d", "php" & phpRev)
 
+  let extensionFile = getExtensionFile()
   if fileExists(extensionFile):
     when not compileOption("verbosity", "0"):
       echo "Removing previous file '", extensionFile, "'"
@@ -64,6 +87,8 @@ task build, "builds the extension":
 
 task clean, "removes the extension from extension dir":
   setCommand "nop"
+
+  let extensionFile = getExtensionFile()
   if fileExists(extensionFile):
     echo "Removing '", extensionFile, "'"
     rmFile extensionFile

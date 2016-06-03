@@ -1,5 +1,5 @@
-# nim build -d:php56 --verbosity:0 --hints:off
-# run nim tests -d:php56
+# nim build -d:php70 --verbosity:0 --hints:off
+# run nim tests -d:php70
 # !run php7r dl("nim7.so"); echo ">".nim_say("World")."<".PHP_EOL;
 # !run php7r dl("nim7.so"); echo ">".nim_add(123, 111)."<".PHP_EOL;
 

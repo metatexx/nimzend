@@ -287,24 +287,18 @@ proc add_assoc_long*(arg: ZValArray, key: cstring, key_len: int, n: int64): int 
 proc add_assoc_double*(arg: ZValArray, key: cstring, key_len: int, n: float64): int {.discardable,importc:"add_assoc_double_ex".}
 proc add_assoc_bool*(arg: ZValArray, key: cstring, key_len: int, n: bool): int {.discardable,importc:"add_assoc_bool_ex".}
 proc add_assoc_null*(arg: ZValArray, key: cstring, key_len: int): int {.discardable,importc:"add_assoc_null_ex".}
-proc add_assoc_string*(arg: ZValArray, key: cstring, key_len: int, str: cstring): int {.discardable,importc:"add_assoc_string_ex".}
-proc add_assoc_stringl*(arg: ZValArray, key: cstring, key_len: int, str: cstring, len: int): int {.discardable,importc:"add_assoc_stringl_ex".}
 proc add_assoc_zval*(arg: ZValArray, key: cstring, key_len: int, val: ZVal): int {.discardable,importc:"add_assoc_zval_ex".}
 
 proc add_index_long*(arg: ZValArray, idx: uint64, n: int64): int {.discardable,importc:"add_index_long".}
 proc add_index_bool*(arg: ZValArray, idx: uint64, n: bool): int {.discardable,importc:"add_index_bool".}
 proc add_index_double*(arg: ZValArray, idx: uint64, n: float64): int {.discardable,importc:"add_index_double".}
 proc add_index_null*(arg: ZValArray, idx: uint64): int {.discardable,importc:"add_index_null".}
-proc add_index_string*(arg: ZValArray, idx: uint64, str: cstring): int {.discardable,importc:"add_index_string".}
-proc add_index_stringl*(arg: ZValArray, idx: uint64, str: cstring, len: int): int {.discardable,importc:"add_index_stringl".}
 proc add_index_zval*(arg: ZValArray, idx: uint64, str: ZVal): int {.discardable,importc:"add_index_zval".}
 
 proc add_next_index_long*(arg: ZValArray, n: int64): int {.discardable,importc:"add_next_index_long".}
 proc add_next_index_double*(arg: ZValArray, n: float64): int {.discardable,importc:"add_next_index_double".}
 proc add_next_index_bool*(arg: ZValArray, n: bool): int {.discardable,importc:"add_next_index_bool".}
 proc add_next_index_null*(arg: ZValArray): int {.importc:"add_next_index_null".}
-proc add_next_index_string*(arg: ZValArray, str: cstring): int {.discardable,importc:"add_next_index_string".}
-proc add_next_index_stringl*(arg: ZValArray, str: cstring, len: int): int {.discardable,importc:"add_next_index_stringl".}
 proc add_next_index_zval*(arg: ZValArray, str: ZVal): int {.discardable,importc:"add_next_index_zval".}
 
 proc zend_hash_internal_pointer_reset_ex*(arg: ZendArray,
@@ -325,6 +319,15 @@ when defined(php700):
   proc zend_hash_get_current_key_ex*(arg: ZendArray, str_index: ptr ZendString, num_index: ptr uint64, pos: ptr ZendPosition):
     int {.discardable,importc:"zend_hash_get_current_key_ex".}
 
+  proc add_assoc_string*(arg: ZValArray, key: cstring, key_len: int, str: cstring): int {.discardable,importc:"add_assoc_string_ex".}
+  proc add_assoc_stringl*(arg: ZValArray, key: cstring, key_len: int, str: cstring, len: uint): int {.discardable,importc:"add_assoc_stringl_ex".}
+
+  proc add_index_string*(arg: ZValArray, idx: uint64, str: cstring): int {.discardable,importc:"add_index_string".}
+  proc add_index_stringl*(arg: ZValArray, idx: uint64, str: cstring, len: int): int {.discardable,importc:"add_index_stringl".}
+
+  proc add_next_index_string*(arg: ZValArray, str: cstring): int {.discardable,importc:"add_next_index_string".}
+  proc add_next_index_stringl*(arg: ZValArray, str: cstring, len: int): int {.discardable,importc:"add_next_index_stringl".}
+
 else:
   # PHP 5.x needs key.len + 1 for the assoc functions
   template klen*(k: string): int = k.len + 1
@@ -337,6 +340,15 @@ else:
 
   proc zend_hash_get_current_key_ex*(arg: ZendArray, key: ptr cstring, klen: ptr uint32, index: ptr uint64,
     duplicate: bool, pos: ptr ZendPosition): int {.discardable,importc:"zend_hash_get_current_key_ex".}
+
+  proc add_assoc_string*(arg: ZValArray, key: cstring, key_len: int, str: cstring, duplicate: int=1): int {.discardable,importc:"add_assoc_string_ex".}
+  proc add_assoc_stringl*(arg: ZValArray, key: cstring, key_len: int, str: cstring, len: uint, duplicate: int=1): int {.discardable,importc:"add_assoc_stringl_ex".}
+
+  proc add_index_string*(arg: ZValArray, idx: uint64, str: cstring, duplicate: int=1): int {.discardable,importc:"add_index_string".}
+  proc add_index_stringl*(arg: ZValArray, idx: uint64, str: cstring, len: int, duplicate: int=1): int {.discardable,importc:"add_index_stringl".}
+
+  proc add_next_index_string*(arg: ZValArray, str: cstring, duplicate: int=1): int {.discardable,importc:"add_next_index_string".}
+  proc add_next_index_stringl*(arg: ZValArray, str: cstring, len: int, duplicate: int=1): int {.discardable,importc:"add_next_index_stringl".}
 
 proc len*(zv: ZValArray): int = zend_array_count(zv.ZVal.value.arr).int
 
