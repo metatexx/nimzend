@@ -1,5 +1,5 @@
-# nim build -d:php56 --verbosity:0 --hints:off
-# run nim tests -d:php56
+# nim build -d:php54 --verbosity:0 --hints:off
+# run nim tests -d:php54
 # !run php7r dl("nim7.so"); echo ">".nim_say("World")."<".PHP_EOL;
 # !run php7r dl("nim7.so"); echo ">".nim_add(123, 111)."<".PHP_EOL;
 
@@ -18,10 +18,10 @@ proc nim_arrays(zva: ZValArray) {.phpfunc.} =
 
   echo "Dump Array as Key : Value pairs (numeric and string index suppored)"
   for ki, zv in pairs(zva):
-    if ki.key != nil:
-      echo ki.key, " : ", $zv
-    else:
+    if ki.key == nil:
       echo ki.idx, " : ", $zv
+    else:
+      echo ki.key, " : ", $zv
 
     if ki.key != nil and ki.key == "a":
       echo "Psst! Wanna buy an a?"

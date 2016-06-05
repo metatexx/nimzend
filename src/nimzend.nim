@@ -611,7 +611,17 @@ iterator pairs*(zva: ZValArray): tuple[k: tuple[key: cstring, idx: uint64], b: Z
       zend_hash_get_current_data_ex(zva.zendArray, elm.addr, pos.addr)
       if elm == nil:
         break;
-      yield ((nil.cstring, 0.uint64), elm[])
+
+      var key: cstring
+      var len: uint32
+      var idx: uint64
+
+      zend_hash_get_current_key_ex(zva.zendArray, key.addr, len.addr, idx.addr, false, pos.addr)
+      if len != 0:
+        yield ((key, 0.uint64), elm[])
+      else:
+        yield ((nil.cstring, idx), elm[])
+
     zend_hash_move_forward_ex(zva.zendArray, pos.addr)
 
 proc `$`*(z: ZVal): string =
