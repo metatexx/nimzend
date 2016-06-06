@@ -5,6 +5,8 @@ when defined(macosx):
   # this is only working for homebrew php installs "but..."
   when defined(php70):
     var phpVer="70"
+  elif defined(php53):
+    var phpVer="53"
   elif defined(php54):
     var phpVer="54"
   elif defined(php55):
