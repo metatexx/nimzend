@@ -328,6 +328,9 @@ when defined(php700):
   proc add_next_index_string*(arg: ZValArray, str: cstring): int {.discardable,importc:"add_next_index_string".}
   proc add_next_index_stringl*(arg: ZValArray, str: cstring, len: int): int {.discardable,importc:"add_next_index_stringl".}
 
+  proc zend_hash_str_find*(arg: ZendArray, key: cstring, key_len: int): ZVal {.importc:"zend_hash_str_find".}
+  proc zend_hash_index_find*(arg: ZendArray, idx: uint32): ZVal {.importc:"zend_hash_index_find".}
+
 else:
   # PHP 5.x needs key.len + 1 for the assoc functions
   template klen*(k: string): int = k.len + 1
@@ -349,6 +352,10 @@ else:
 
   proc add_next_index_string*(arg: ZValArray, str: cstring, duplicate: int=1): int {.discardable,importc:"add_next_index_string".}
   proc add_next_index_stringl*(arg: ZValArray, str: cstring, len: int, duplicate: int=1): int {.discardable,importc:"add_next_index_stringl".}
+
+  proc zend_hash_find*(arg: ZendArray, key: cstring, key_len: int, data: ptr ptr ZVal): int {.discardable,importc:"zend_hash_find".}
+  proc zend_hash_index_find*(arg: ZendArray, idx: uint32, data: ptr ptr ZVal): int {.discardable,importc:"zend_hash_index_find".}
+
 
 proc len*(zv: ZValArray): int = zend_array_count(zv.ZVal.value.arr).int
 
@@ -485,7 +492,7 @@ template returnBool*(s) =
 converter zvalFromZValArray*(val: ZValArray): ZVal = val.ZVal
 
 # get the ZendArray (HashTable) from the ZVal(Array)
-template zendArray*(v: ZValArray): ZendArray = zva.ZVal.value.arr
+template zendArray*(v: ZValArray): ZendArray = v.ZVal.value.arr
 
 type NULLType* = distinct pointer
 const NULL* = nil.NULLType
@@ -567,6 +574,27 @@ proc `[]=`*(arr: ZValArray, key: string, val: ZVal) =
   `[]=`(arr, key, key.klen, val)
 
 # Array helpers
+proc `[]`*(arr: ZValArray, key: string): ZVal =
+  when defined(php700):
+    zend_hash_str_find(arr.zendArray, key.cstring, key.klen)
+  else:
+    var elm: ptr ZVal
+    zend_hash_find(arr.zendArray, key.cstring, key.klen, elm.addr)
+    if elm == nil:
+      result = nil
+    else:
+      result = elm[]
+
+proc `[]`*(arr: ZValArray, idx: uint32): ZVal =
+  when defined(php700):
+    zend_hash_index_find(arr.zendArray, idx)
+  else:
+    var elm: ptr ZVal
+    zend_hash_index_find(arr.zendArray, idx, elm.addr)
+    if elm == nil:
+      result = nil
+    else:
+      result = elm[]
 
 iterator items*(zva: ZValArray): ZVal =
   var pos: ZendPosition # 7.0 "uint32" / 5.x ptr ZendBucketObj
