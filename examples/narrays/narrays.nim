@@ -9,7 +9,7 @@ import "../../src/nimzend.nim"
 # my code
 #
 
-proc nim_arrays(zva: ZValArray) {.phpfunc.} =
+proc nim_arrays(zva: ZValArray, zvar: ZValArray) {.phpfunc.} =
   phpPrintf("The %s has %d elements!\n", zva.zvalType, zva.len)
 
   #echo "Dump Array Values (and transform into some other types)"
@@ -32,5 +32,9 @@ proc nim_arrays(zva: ZValArray) {.phpfunc.} =
 
   echo "At 0 there is: ", $zva[0]
   echo "At 4 there is: ", $zva[4].repr
+
+  # slightly odd but works for ZValArray
+  zvar.add 1
+  zvar.add 2
 
 finishExtension("narrays","0.1")
